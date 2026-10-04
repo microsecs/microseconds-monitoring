@@ -13,7 +13,7 @@ export function isJwtIssuedAtFutureError(error: unknown){
 }
 
 export async function withSupabaseClockSkewRetry<T>(
-  operation:()=>Promise<T>,
+  operation:()=>PromiseLike<T>,
   options:{attempts?:number;delayMs?:number}={}
 ):Promise<T>{
   const attempts=Math.max(1,options.attempts ?? 3);

@@ -81,9 +81,7 @@ export default function ImportPage(){
     if(selectedTenant && browseRequestedRef.current){
       browseRequestedRef.current=false;
       const timer=window.setTimeout(()=>fileInputRef.current?.click(),50);
-      if(initialLoading)return <PageLoading/>;
-
-  return ()=>window.clearTimeout(timer);
+      return ()=>window.clearTimeout(timer);
     }
   },[selectedTenant]);
 
@@ -206,6 +204,7 @@ export default function ImportPage(){
   const shown=useMemo(()=>records.filter(r=>filter==="all"||r.level===filter),[records,filter]);
   const selected=tenants.find(t=>t.id===selectedTenant);
   const entraUrl="https://entra.microsoft.com/#view/Microsoft_AAD_IAM/SignInEventsV3Blade";
+  if(initialLoading)return <PageLoading/>;
   return <>{importing?<div className="syncOverlay" role="status" aria-live="polite"><div className="syncOverlayCard"><span className="spinner spinnerLarge"/><div><strong>Importing sign-ins…</strong><div className="muted">{importStatus||"Processing CSV import…"} Please leave this page open.</div></div></div></div>:null}<div className="topbar"><div><div className="title">Import Microsoft Sign-ins</div><div className="subtitle">CSV analysis with IP location, network ownership and privacy intelligence</div></div><a className="button" href="/tenants">Manage Tenants</a></div>
     <div className="card uploadCard">
       <h2>1. Select Microsoft 365 tenant</h2>

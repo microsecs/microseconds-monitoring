@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getDevOrganization, getRecentHistory } from "@/lib/history";
+import { getDevOrganization, getRecentHistoryPage } from "@/lib/history";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export default async function DashboardPage() {
 
   try {
     [rows, org] = await Promise.all([
-      getRecentHistory(500),
+      getRecentHistoryPage({ page: 1, pageSize: 250 }).then((result) => result.rows),
       getDevOrganization(),
     ]);
   } catch (e: any) {
