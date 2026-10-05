@@ -17,7 +17,7 @@ export default function ForgotPasswordPage() {
     const { error } = await sb.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback?next=/account`,
     });
-    setMessage(error ? error.message : "Password reset email sent. Check your inbox and follow the link to choose a new password.");
+    setMessage(error ? error.message : "If an account exists for this email address, we’ve sent a password reset link. Check your inbox and spam folder.");
     setBusy(false);
   }
 

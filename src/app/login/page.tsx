@@ -38,7 +38,7 @@ export default function LoginPage() {
     });
     if (error) setMsg(error.message);
     else if (data.session) window.location.href = "/tenants";
-    else setMsg("Check your email to confirm your account, then return here to sign in.");
+    else setMsg("Check your email. If this address can be registered, we’ve sent a confirmation link. If you already have an account, use Sign In or Forgot Password.");
     setBusy(false);
   }
 

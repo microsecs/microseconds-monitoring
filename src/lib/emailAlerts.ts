@@ -33,7 +33,7 @@ export async function sendIncidentAlerts(params: {
 
   const from =
     process.env.SECURITY_ALERT_FROM ||
-    "MicroSECONDS 365 Security <security@microseconds.com>";
+    "MicroSECONDS Monitoring <monitoring@microseconds.com>";
 
   const subject =
     `[${String(params.incident?.severity || "review").toUpperCase()}] ` +
@@ -55,7 +55,7 @@ export async function sendIncidentAlerts(params: {
 
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:680px;margin:auto">
-        <h2>MicroSECONDS 365 Security Alert</h2>
+        <h2>MicroSECONDS Monitoring Security Alert</h2>
         <p><strong>Tenant:</strong> ${escapeHtml(params.tenantName)}</p>
         <p><strong>User:</strong> ${escapeHtml(params.signin?.user_display_name || params.signin?.user_principal_name || "Unknown")}</p>
         <p><strong>Time:</strong> ${escapeHtml(params.signin?.event_time || "Unknown")}</p>
