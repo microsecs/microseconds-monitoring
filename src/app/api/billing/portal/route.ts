@@ -1,0 +1,5 @@
+import {NextResponse} from "next/server";
+import {getOrCreateDevOrganization,getSupabaseAdmin} from "@/lib/supabaseAdmin";
+import {getSupabaseServer} from "@/lib/supabaseServer";
+import {createPortalSession} from "@/lib/stripeBilling";
+export async function POST(){try{const auth=await getSupabaseServer();const{data:{user}}=await auth.auth.getUser();if(!user)return NextResponse.json({error:"Authentication required."},{status:401});const org:any=await getOrCreateDevOrganization();const db=getSupabaseAdmin();const{data:member}=await db.from("organization_members").select("role").eq("organization_id",org.id).eq("user_id",user.id).maybeSingle();if(member?.role!=="owner")return NextResponse.json({error:"Only the organization owner can manage billing."},{status:403});if(!org.stripe_customer_id)return NextResponse.json({error:"No Stripe billing profile exists yet."},{status:400});const session=await createPortalSession(org.stripe_customer_id);return NextResponse.json({url:session.url});}catch(e:any){return NextResponse.json({error:e?.message||"Could not open billing portal."},{status:500});}}
