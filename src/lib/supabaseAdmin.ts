@@ -40,15 +40,50 @@ export function getSupabaseAdmin(){
 }
 
 export async function getOrCreateDevOrganization(){
+  // Kept under the legacy name so existing routes do not need a risky bulk rewrite.
+  // It now resolves the authenticated user's organization instead of a shared dev organization.
+  const { getSupabaseServer } = await import("@/lib/supabaseServer");
+  const auth = await getSupabaseServer();
+  const { data: { user }, error: authError } = await auth.auth.getUser();
+  if(authError || !user) throw new Error("AUTH_REQUIRED");
+
   return withSupabaseClockSkewRetry(async()=>{
     const supabase=getSupabaseAdmin();
-    const slug=process.env.DEV_ORGANIZATION_SLUG || "microseconds-dev";
-    const name=process.env.DEV_ORGANIZATION_NAME || "MicroSECONDS Computer Consulting";
-    const {data:existing,error:findError}=await supabase.from("organizations").select("id,slug,name").eq("slug",slug).maybeSingle();
-    if(findError) throw findError;
-    if(existing) return existing;
-    const {data,error}=await supabase.from("organizations").insert({slug,name,plan:"development",subscription_status:"development"}).select("id,slug,name").single();
-    if(error) throw error;
-    return data;
+    const {data:membership,error:memberError}=await supabase
+      .from("organization_members")
+      .select("organization_id,role,organizations(id,slug,name,plan,subscription_status,trial_ends_at)")
+      .eq("user_id",user.id)
+      .limit(1)
+      .maybeSingle();
+    if(memberError) throw memberError;
+    if(membership?.organizations){
+      const org:any=Array.isArray(membership.organizations)?membership.organizations[0]:membership.organizations;
+      if(org) return org;
+    }
+
+    const bootstrapEmail=(process.env.BOOTSTRAP_OWNER_EMAIL || "").trim().toLowerCase();
+    if(bootstrapEmail && (user.email || "").toLowerCase()===bootstrapEmail){
+      const slug=process.env.DEV_ORGANIZATION_SLUG || "microseconds-dev";
+      const {data:existing,error:findError}=await supabase.from("organizations").select("id,slug,name,plan,subscription_status,trial_ends_at").eq("slug",slug).maybeSingle();
+      if(findError) throw findError;
+      if(existing){
+        const {error:linkError}=await supabase.from("organization_members").upsert({organization_id:existing.id,user_id:user.id,role:"owner"},{onConflict:"organization_id,user_id"});
+        if(linkError) throw linkError;
+        return existing;
+      }
+    }
+
+    const email=user.email || "User";
+    const domain=email.includes("@")?email.split("@")[1]:"";
+    const metadataName=String(user.user_metadata?.organization_name || user.user_metadata?.full_name || "").trim();
+    const name=metadataName || (domain ? domain : "My Organization");
+    const slug=`org-${user.id.slice(0,8)}-${Date.now().toString(36)}`;
+    const {data:created,error:createError}=await supabase.from("organizations")
+      .insert({slug,name,plan:"trial",subscription_status:"inactive"})
+      .select("id,slug,name,plan,subscription_status,trial_ends_at").single();
+    if(createError) throw createError;
+    const {error:linkError}=await supabase.from("organization_members").insert({organization_id:created.id,user_id:user.id,role:"owner"});
+    if(linkError) throw linkError;
+    return created;
   });
 }

@@ -1,6 +1,7 @@
 import "./globals.css";
 import Link from "next/link";
 import IncidentsNavLink from "@/components/IncidentsNavLink";
+import AuthControls from "@/components/AuthControls";
 
 export const metadata = {
   title: "MicroSECONDS Monitoring",
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/settings">Settings</Link>
             <Link href="/support">Support</Link>
           </nav>
+          <AuthControls/>
         </header>
         <div className="appShell">
           <main className="main">{children}</main>
