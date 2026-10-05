@@ -73,6 +73,7 @@ export default function TenantsPage() {
   const [orderSaved, setOrderSaved] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [automaticMonitoringEnabled, setAutomaticMonitoringEnabled] = useState(false);
+  const [tenantActionStatus, setTenantActionStatus] = useState<{ title: string; detail: string; busy: boolean } | null>(null);
 
   async function load() {
     const res = await fetch("/api/tenants", { cache: "no-store" });
@@ -149,15 +150,21 @@ export default function TenantsPage() {
     const next=String(requestedName ?? googleNameEdits[g.id] ?? "").trim();
     if(!next)return;
     setGoogleRenamingId(g.id); setError(""); setMessage("");
+    setTenantActionStatus({ title: "Renaming tenant…", detail: `Updating ${g.display_name || g.primary_domain || "Google Workspace"}.`, busy: true });
     try{
       const res=await fetch(`/api/google/tenants/${encodeURIComponent(g.id)}`,{
         method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({displayName:next})
       });
       const data=await res.json();
       if(!res.ok)throw new Error(data?.error||"Could not rename Google Workspace tenant.");
-      setMessage(`Google Workspace tenant display name changed to ${next}.`);
       await load();
-    }catch(e:any){setError(e?.message||"Could not rename Google Workspace tenant.");}
+      setTenantActionStatus({ title: "Tenant renamed", detail: `Google Workspace tenant display name changed to ${next}.`, busy: false });
+      window.setTimeout(() => setTenantActionStatus(null), 3000);
+    }catch(e:any){
+      const detail=e?.message||"Could not rename Google Workspace tenant.";
+      setTenantActionStatus({ title: "Rename failed", detail, busy: false });
+      window.setTimeout(() => setTenantActionStatus(null), 4000);
+    }
     finally{setGoogleRenamingId("");}
   }
 
@@ -165,13 +172,19 @@ export default function TenantsPage() {
     const label=g.display_name||g.primary_domain||"Google Workspace";
     if(!window.confirm(`Delete ${label}?\n\nThis permanently removes this Google Workspace connection and its stored sign-in history/findings. This cannot be undone.`))return;
     setGoogleDeletingId(g.id); setError(""); setMessage("");
+    setTenantActionStatus({ title: "Deleting tenant…", detail: `Removing ${label} and its stored security history.`, busy: true });
     try{
       const res=await fetch(`/api/google/tenants/${encodeURIComponent(g.id)}`,{method:"DELETE"});
       const data=await res.json();
       if(!res.ok)throw new Error(data?.error||"Could not delete Google Workspace tenant.");
-      setMessage(`${label} and its stored Google sign-in history were deleted.`);
       await load();
-    }catch(e:any){setError(e?.message||"Could not delete Google Workspace tenant.");}
+      setTenantActionStatus({ title: "Tenant deleted", detail: `${label} and its stored Google sign-in history were deleted.`, busy: false });
+      window.setTimeout(() => setTenantActionStatus(null), 3000);
+    }catch(e:any){
+      const detail=e?.message||"Could not delete Google Workspace tenant.";
+      setTenantActionStatus({ title: "Delete failed", detail, busy: false });
+      window.setTimeout(() => setTenantActionStatus(null), 4000);
+    }
     finally{setGoogleDeletingId("");}
   }
 
@@ -182,6 +195,7 @@ export default function TenantsPage() {
     setRenamingId(t.id);
     setError("");
     setMessage("");
+    setTenantActionStatus({ title: "Renaming tenant…", detail: `Updating ${t.tenant_name || t.tenant_id}.`, busy: true });
 
     try {
       const res = await fetch(`/api/tenants/${encodeURIComponent(t.id)}`, {
@@ -193,10 +207,13 @@ export default function TenantsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Could not update tenant name.");
 
-      setMessage(`Tenant display name changed to ${next}.`);
       await load();
+      setTenantActionStatus({ title: "Tenant renamed", detail: `Tenant display name changed to ${next}.`, busy: false });
+      window.setTimeout(() => setTenantActionStatus(null), 3000);
     } catch (e: any) {
-      setError(e?.message || "Could not update tenant name.");
+      const detail = e?.message || "Could not update tenant name.";
+      setTenantActionStatus({ title: "Rename failed", detail, busy: false });
+      window.setTimeout(() => setTenantActionStatus(null), 4000);
     } finally {
       setRenamingId("");
     }
@@ -265,14 +282,18 @@ export default function TenantsPage() {
     setDeletingId(t.id);
     setError("");
     setMessage("");
+    setTenantActionStatus({ title: "Deleting tenant…", detail: `Removing ${label} and its stored security history.`, busy: true });
     try {
       const res = await fetch(`/api/tenants/${encodeURIComponent(t.id)}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Could not delete tenant.");
-      setMessage(`${label} and its tenant-specific security history were deleted.`);
       await load();
+      setTenantActionStatus({ title: "Tenant deleted", detail: `${label} and its tenant-specific security history were deleted.`, busy: false });
+      window.setTimeout(() => setTenantActionStatus(null), 3000);
     } catch (e: any) {
-      setError(e?.message || "Could not delete tenant.");
+      const detail = e?.message || "Could not delete tenant.";
+      setTenantActionStatus({ title: "Delete failed", detail, busy: false });
+      window.setTimeout(() => setTenantActionStatus(null), 4000);
     } finally {
       setDeletingId("");
     }
@@ -435,6 +456,17 @@ export default function TenantsPage() {
 
   return (
     <>
+      {tenantActionStatus ? (
+        <div className="syncOverlay" role="status" aria-live="polite">
+          <div className="syncOverlayCard">
+            {tenantActionStatus.busy ? <span className="spinner spinnerLarge" /> : null}
+            <div>
+              <strong>{tenantActionStatus.title}</strong>
+              <div className="muted">{tenantActionStatus.detail}</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {anySyncing ? (
         <div className="syncOverlay" role="status" aria-live="polite">
           <div className="syncOverlayCard">
@@ -645,9 +677,9 @@ export default function TenantsPage() {
                         <button className="button compactAction" disabled={renamingId === t.id} onClick={() => {
                           const next = window.prompt("Rename tenant", t.tenant_name || "");
                           if (next !== null && next.trim()) renameTenant(t, next);
-                        }}>{renamingId === t.id ? "Saving…" : "Rename"}</button>
+                        }}>Rename</button>
                         <button className="button compactAction deleteAction" disabled={deletingId === t.id} onClick={() => deleteTenant(t)}>
-                          {deletingId === t.id ? "Deleting…" : "Delete"}
+                          Delete
                         </button>
                       </div>
                     </td>
@@ -691,9 +723,9 @@ export default function TenantsPage() {
                       <button className="button compactAction" disabled={googleRenamingId===g.id} onClick={() => {
                         const next = window.prompt("Rename tenant", g.display_name || "");
                         if (next !== null && next.trim()) renameGoogleTenant(g, next);
-                      }}>{googleRenamingId===g.id ? "Saving…" : "Rename"}</button>
+                      }}>Rename</button>
                       <button className="button compactAction deleteAction" disabled={googleDeletingId===g.id} onClick={()=>deleteGoogleTenant(g)}>
-                        {googleDeletingId===g.id ? "Deleting…" : "Delete"}
+                        Delete
                       </button>
                     </div>
                   </td>
