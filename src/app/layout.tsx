@@ -23,12 +23,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <body>
-        <header className={`siteHeader${user ? "" : " publicHeader"}`}>
-          <Link href={user ? "/tenants" : "/login"} className="headerBrand" aria-label="MicroSECONDS Monitoring">
-            <img src="/microseconds-logo.png" alt="MicroSECONDS" className="headerLogo" />
-            <small className="headerProductName">MONITORING</small>
-          </Link>
-          {user && <>
+        {user && (
+          <header className="siteHeader">
+            <Link href="/tenants" className="headerBrand" aria-label="MicroSECONDS Monitoring">
+              <img src="/microseconds-logo.png" alt="MicroSECONDS" className="headerLogo" />
+              <small className="headerProductName">MONITORING</small>
+            </Link>
             <nav className="topNav">
               <Link href="/tenants">Tenants</Link>
               <IncidentsNavLink/>
@@ -38,8 +38,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/support">Support</Link>
             </nav>
             <AuthControls/>
-          </>}
-        </header>
+          </header>
+        )}
         <div className="appShell">
           <main className="main">{children}</main>
           <footer className="siteFooter">
