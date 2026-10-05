@@ -2,6 +2,7 @@ import "./globals.css";
 import Link from "next/link";
 import IncidentsNavLink from "@/components/IncidentsNavLink";
 import AuthControls from "@/components/AuthControls";
+import ProductAdminNavLink from "@/components/ProductAdminNavLink";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 
 export const metadata = {
@@ -36,6 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/import">Import CSV</Link>
               <Link href="/settings">Settings</Link>
               <Link href="/support">Support</Link>
+              <ProductAdminNavLink/>
             </nav>
             <AuthControls/>
           </header>
