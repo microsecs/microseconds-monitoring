@@ -49,10 +49,21 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && path === "/login") {
+    const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
     const destination = request.nextUrl.clone();
-    destination.pathname = "/tenants";
+    destination.pathname = aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2" ? "/mfa" : "/tenants";
     destination.search = "";
     return NextResponse.redirect(destination);
+  }
+
+  if (user && path !== "/mfa" && path !== "/account" && !path.startsWith("/api/auth/")) {
+    const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+      const challenge = request.nextUrl.clone();
+      challenge.pathname = "/mfa";
+      challenge.search = "";
+      return NextResponse.redirect(challenge);
+    }
   }
 
   return response;

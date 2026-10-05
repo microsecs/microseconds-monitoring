@@ -1,29 +1,13 @@
 "use client";
-
-import { useEffect, useState } from "react";
+import { useEffect,useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-
-export default function AccountPage() {
-  const sb = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => { sb.auth.getUser().then(({data}) => setEmail(data.user?.email || "")); }, []);
-
-  async function changePassword(e: React.FormEvent) {
-    e.preventDefault();
-    setMessage("");
-    if (password.length < 8) { setMessage("Password must be at least 8 characters."); return; }
-    if (password !== confirm) { setMessage("The passwords do not match."); return; }
-    setBusy(true);
-    const { error } = await sb.auth.updateUser({ password });
-    if (error) setMessage(error.message);
-    else { setMessage("Your password has been updated."); setPassword(""); setConfirm(""); }
-    setBusy(false);
-  }
-
-  return <><div className="topbar"><div><div className="title">Account</div><div className="subtitle">Manage your MicroSECONDS Monitoring sign-in.</div></div></div><div className="accountGrid"><section className="card accountCard"><h2>Account Information</h2><div className="accountLabel">Signed in as</div><div className="accountEmail">{email || "Loading…"}</div><p className="muted accountHelp">This account controls access to your organization and connected tenants.</p></section><section className="card accountCard"><h2>Change Password</h2><form onSubmit={changePassword} className="accountForm"><label>New password<input type="password" required minLength={8} value={password} onChange={e=>setPassword(e.target.value)} autoComplete="new-password"/></label><label>Confirm new password<input type="password" required minLength={8} value={confirm} onChange={e=>setConfirm(e.target.value)} autoComplete="new-password"/></label>{message&&<div className="authMessage darkMessage">{message}</div>}<button className="button primary" disabled={busy}>{busy?"Updating…":"Update Password"}</button></form></section></div></>;
-}
+type Factor={id:string;friendly_name?:string;status:string};
+type Notice={kind:"success"|"error";text:string}|null;
+export default function AccountPage(){const sb=createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[confirm,setConfirm]=useState("");const[notice,setNotice]=useState<Notice>(null);const[busy,setBusy]=useState(false);const[factor,setFactor]=useState<Factor|null>(null);const[enrollId,setEnrollId]=useState("");const[qr,setQr]=useState("");const[secret,setSecret]=useState("");const[mfaCode,setMfaCode]=useState("");const[mfaBusy,setMfaBusy]=useState(false);
+async function loadMfa(){const{data,error}=await sb.auth.mfa.listFactors();if(error){setNotice({kind:"error",text:error.message});return}setFactor((data?.totp.find(f=>f.status==="verified") as Factor)||null)}
+useEffect(()=>{sb.auth.getUser().then(({data})=>setEmail(data.user?.email||""));void loadMfa()},[]);
+async function changePassword(e:React.FormEvent){e.preventDefault();setNotice(null);if(password.length<8){setNotice({kind:"error",text:"Password must be at least 8 characters."});return}if(password!==confirm){setNotice({kind:"error",text:"The passwords do not match."});return}setBusy(true);const{error}=await sb.auth.updateUser({password});setNotice(error?{kind:"error",text:error.message}:{kind:"success",text:"Your password has been updated."});if(!error){setPassword("");setConfirm("")}setBusy(false)}
+async function startMfa(){setMfaBusy(true);setNotice(null);const{data,error}=await sb.auth.mfa.enroll({factorType:"totp",friendlyName:"MicroSECONDS Monitoring"});if(error){setNotice({kind:"error",text:error.message});setMfaBusy(false);return}setEnrollId(data.id);setQr(data.totp.qr_code);setSecret(data.totp.secret);setMfaBusy(false)}
+async function verifyMfa(e:React.FormEvent){e.preventDefault();if(!enrollId)return;setMfaBusy(true);setNotice(null);const{data:challenge,error:ce}=await sb.auth.mfa.challenge({factorId:enrollId});if(ce){setNotice({kind:"error",text:ce.message});setMfaBusy(false);return}const{error}=await sb.auth.mfa.verify({factorId:enrollId,challengeId:challenge.id,code:mfaCode});if(error){setNotice({kind:"error",text:error.message});setMfaBusy(false);return}setEnrollId("");setQr("");setSecret("");setMfaCode("");await loadMfa();setNotice({kind:"success",text:"Authenticator MFA is now enabled for your account."});setMfaBusy(false)}
+async function removeMfa(){if(!factor||!window.confirm("Remove authenticator MFA from this account? Your next sign-in will only require your password."))return;setMfaBusy(true);setNotice(null);const{error}=await sb.auth.mfa.unenroll({factorId:factor.id});if(error)setNotice({kind:"error",text:error.message});else{setFactor(null);setNotice({kind:"success",text:"Authenticator MFA has been removed."})}setMfaBusy(false)}
+return <><div className="topbar"><div><div className="title">Account</div><div className="subtitle">Manage your MicroSECONDS Monitoring sign-in and security.</div></div></div>{notice&&<div className={`accountStatus accountStatus-${notice.kind}`} role="status"><span className="authStatusDot"/>{notice.text}</div>}<div className="accountGrid"><section className="card accountCard"><h2>Account Information</h2><div className="accountLabel">Signed in as</div><div className="accountEmail">{email||"Loading…"}</div><p className="muted accountHelp">This account controls access to your organization and connected tenants.</p></section><section className="card accountCard"><h2>Change Password</h2><form onSubmit={changePassword} className="accountForm"><label>New password<input type="password" required minLength={8} value={password} onChange={e=>setPassword(e.target.value)} autoComplete="new-password"/></label><label>Confirm new password<input type="password" required minLength={8} value={confirm} onChange={e=>setConfirm(e.target.value)} autoComplete="new-password"/></label><button className="button primary" disabled={busy}>{busy?"Updating…":"Update Password"}</button></form></section><section className="card accountCard accountMfaCard"><h2>Multi-Factor Authentication</h2>{factor?<><div className="mfaEnabled"><span className="mfaEnabledDot"/>Authenticator app enabled</div><p className="muted accountHelp">Your account requires a six-digit authenticator code after your password when a new sign-in needs MFA verification.</p><button className="button dangerButton" onClick={removeMfa} disabled={mfaBusy}>{mfaBusy?"Removing…":"Remove MFA"}</button></>:enrollId?<><p className="muted accountHelp">Scan this QR code with Microsoft Authenticator, Google Authenticator, 1Password, or another TOTP authenticator, then enter the six-digit code below.</p><div className="mfaQrWrap"><img src={qr} alt="Authenticator setup QR code" className="mfaQr"/></div><details className="mfaSecret"><summary>Can’t scan the QR code?</summary><div>Setup key: <code>{secret}</code></div></details><form onSubmit={verifyMfa} className="accountForm"><label>Six-digit code<input className="mfaCodeInput" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={mfaCode} onChange={e=>setMfaCode(e.target.value.replace(/\D/g,"").slice(0,6))}/></label><button className="button primary" disabled={mfaBusy||mfaCode.length!==6}>{mfaBusy?"Verifying…":"Verify & Enable MFA"}</button></form></>:<><div className="mfaDisabled">Authenticator app not enabled</div><p className="muted accountHelp">Add an authenticator app for an extra layer of protection on your MicroSECONDS Monitoring account.</p><button className="button primary" onClick={startMfa} disabled={mfaBusy}>{mfaBusy?"Preparing…":"Set Up MFA"}</button></>}</section></div></>}
