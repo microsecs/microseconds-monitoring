@@ -18,6 +18,22 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function getOrganizationProfileWithRetry(accessToken: string) {
+  const delays = [0, 1500, 3000, 6000];
+  let lastError: unknown = null;
+  for (const delay of delays) {
+    if (delay) await sleep(delay);
+    try {
+      return await getOrganizationProfile(accessToken);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  // Friendly naming must never block connecting a tenant. A later refresh can repair it.
+  console.warn("Microsoft organization profile lookup failed after consent", lastError);
+  return null;
+}
+
 async function verifySignInAccessWithRetry(accessToken: string) {
   const delays = [0, 2000, 4000, 8000];
   let lastError: any = null;
@@ -100,15 +116,11 @@ export async function GET(req: NextRequest) {
   try {
     const accessToken = await getAppAccessToken(tenantId);
 
-    try {
-      const profile = await getOrganizationProfile(accessToken);
-      graphFriendlyName =
-        profile?.displayName ||
-        profile?.defaultDomain ||
-        null;
-    } catch {
-      // Friendly naming is optional.
-    }
+    const profile = await getOrganizationProfileWithRetry(accessToken);
+    graphFriendlyName =
+      profile?.displayName ||
+      profile?.defaultDomain ||
+      null;
 
     try {
       const verification = await verifySignInAccessWithRetry(accessToken);
