@@ -81,7 +81,6 @@ export default function LoginPage() {
             {mode === "login" ? "Create account" : "Sign in"}
           </button>
         </div>
-        <div className="authSecurityNote">Secure cloud-based identity monitoring · Nothing to install</div>
       </div>
     </div>
   );

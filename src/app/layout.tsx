@@ -42,11 +42,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         )}
         <div className="appShell">
           <main className="main">{children}</main>
-          <footer className="siteFooter">
-            <span>© 2026 MicroSECONDS Computer Consulting</span>
-            <span className="footerDot">·</span>
-            <span>MicroSECONDS Monitoring</span>
-          </footer>
+          {user && (
+            <footer className="siteFooter">
+              <span>© 2026 MicroSECONDS Computer Consulting</span>
+              <span className="footerDot">·</span>
+              <span>MicroSECONDS Monitoring</span>
+            </footer>
+          )}
         </div>
       </body>
     </html>
