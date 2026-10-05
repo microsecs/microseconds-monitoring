@@ -57,7 +57,20 @@ export async function getOrCreateDevOrganization(){
       .maybeSingle();
     if(memberError) throw memberError;
     if(membership?.organizations){
-      const org:any=Array.isArray(membership.organizations)?membership.organizations[0]:membership.organizations;
+      let org:any=Array.isArray(membership.organizations)?membership.organizations[0]:membership.organizations;
+      // Repair organizations created by the pre-trial account path. A trial plan with
+      // inactive status and no trial dates has never actually started its trial.
+      if(org && String(org.plan || "").toLowerCase()==="trial" && String(org.subscription_status || "inactive").toLowerCase()==="inactive" && !org.trial_ends_at){
+        const trialStartedAt=new Date();
+        const trialEndsAt=new Date(trialStartedAt.getTime()+30*24*60*60*1000);
+        const {data:repaired,error:repairError}=await supabase.from("organizations")
+          .update({subscription_status:"trialing",trial_started_at:trialStartedAt.toISOString(),trial_ends_at:trialEndsAt.toISOString()})
+          .eq("id",org.id)
+          .select("id,slug,name,plan,subscription_status,trial_started_at,trial_ends_at,stripe_customer_id,stripe_subscription_id,stripe_price_id,subscription_current_period_end,subscription_cancel_at_period_end,subscription_updated_at")
+          .single();
+        if(repairError) throw repairError;
+        org=repaired;
+      }
       if(org) return org;
     }
 
@@ -79,7 +92,7 @@ export async function getOrCreateDevOrganization(){
     const name=metadataName || (domain ? domain : "My Organization");
     const slug=`org-${user.id.slice(0,8)}-${Date.now().toString(36)}`;
     const {data:created,error:createError}=await supabase.from("organizations")
-      .insert({slug,name,plan:"trial",subscription_status:"inactive"})
+      .insert({slug,name,plan:"trial",subscription_status:"trialing",trial_started_at:new Date().toISOString(),trial_ends_at:new Date(Date.now()+30*24*60*60*1000).toISOString()})
       .select("id,slug,name,plan,subscription_status,trial_started_at,trial_ends_at,stripe_customer_id,stripe_subscription_id,stripe_price_id,subscription_current_period_end,subscription_cancel_at_period_end,subscription_updated_at").single();
     if(createError) throw createError;
     const {error:linkError}=await supabase.from("organization_members").insert({organization_id:created.id,user_id:user.id,role:"owner"});
