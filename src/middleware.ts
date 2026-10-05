@@ -7,7 +7,7 @@ type CookieToSet = {
   options?: Parameters<NextResponse["cookies"]["set"]>[2];
 };
 
-const PUBLIC_PREFIXES = ["/login", "/auth/callback"];
+const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/auth/callback"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -50,7 +50,7 @@ export async function middleware(request: NextRequest) {
 
   if (user && path === "/login") {
     const destination = request.nextUrl.clone();
-    destination.pathname = "/dashboard";
+    destination.pathname = "/tenants";
     destination.search = "";
     return NextResponse.redirect(destination);
   }
