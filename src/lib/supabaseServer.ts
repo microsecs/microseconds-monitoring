@@ -7,7 +7,7 @@ type CookieToSet = {
   options?: Parameters<Awaited<ReturnType<typeof cookies>>["set"]>[2];
 };
 
-export async function getSupabaseServerClient() {
+export async function getSupabaseServer() {
   const cookieStore = await cookies();
 
   return createServerClient(
