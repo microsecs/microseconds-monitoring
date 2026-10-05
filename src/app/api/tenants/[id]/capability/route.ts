@@ -1,10 +1,10 @@
 import {NextRequest,NextResponse} from "next/server";
-import {getOrCreateDevOrganization,getSupabaseAdmin} from "@/lib/supabaseAdmin";
+import {requireWritableOrganization,getSupabaseAdmin} from "@/lib/supabaseAdmin";
 import {checkTenantAutomaticMonitoring} from "@/lib/tenantCapability";
 
 export async function POST(_req:NextRequest,context:{params:Promise<{id:string}>}){
   try{
-    const {id}=await context.params; const db=getSupabaseAdmin(); const org=await getOrCreateDevOrganization();
+    const {id}=await context.params; const db=getSupabaseAdmin(); const org=await requireWritableOrganization();
     const {data:t,error}=await db.from("microsoft_tenants").select("id,tenant_id,tenant_name")
       .eq("id",id).eq("organization_id",org.id).maybeSingle();
     if(error)throw error;

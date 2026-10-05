@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrCreateDevOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { requireWritableOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { processTenantIncidents } from "@/lib/incidents";
 
 export async function POST(req: NextRequest) {
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getSupabaseAdmin();
-    const org = await getOrCreateDevOrganization();
+    const org = await requireWritableOrganization();
 
     const { data: tenant, error } = await db
       .from("microsoft_tenants")

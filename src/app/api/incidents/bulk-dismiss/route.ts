@@ -1,12 +1,12 @@
 import {NextRequest,NextResponse} from "next/server";
-import {getOrCreateDevOrganization,getSupabaseAdmin} from "@/lib/supabaseAdmin";
+import {requireWritableOrganization,getSupabaseAdmin} from "@/lib/supabaseAdmin";
 
 export async function POST(req:NextRequest){
   try{
     const body=await req.json();
     const ids=Array.isArray(body?.ids)?Array.from(new Set(body.ids.map((x:any)=>String(x)).filter(Boolean))):[];
     if(!ids.length)return NextResponse.json({error:"No incidents selected."},{status:400});
-    const org=await getOrCreateDevOrganization();
+    const org=await requireWritableOrganization();
     const db=getSupabaseAdmin();
     let updated=0;
     for(let i=0;i<ids.length;i+=40){

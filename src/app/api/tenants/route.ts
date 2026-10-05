@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { getOrCreateDevOrganization, getSupabaseAdmin, withSupabaseClockSkewRetry } from "@/lib/supabaseAdmin";
+import { getOrCreateDevOrganization, requireWritableOrganization, getSupabaseAdmin, withSupabaseClockSkewRetry } from "@/lib/supabaseAdmin";
 
 export async function GET() {
   try {
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getSupabaseAdmin();
-    const org = await getOrCreateDevOrganization();
+    const org = await requireWritableOrganization();
 
     const tenantId =
       suppliedTenantId ||

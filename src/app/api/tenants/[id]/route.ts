@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrCreateDevOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { requireWritableOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 export async function PATCH(
   req: NextRequest,
@@ -18,7 +18,7 @@ export async function PATCH(
     }
 
     const supabase = getSupabaseAdmin();
-    const org = await getOrCreateDevOrganization();
+    const org = await requireWritableOrganization();
 
     const { data, error } = await supabase
       .from("microsoft_tenants")
@@ -54,7 +54,7 @@ export async function DELETE(
   try {
     const { id } = await context.params;
     const supabase = getSupabaseAdmin();
-    const org = await getOrCreateDevOrganization();
+    const org = await requireWritableOrganization();
 
     const { data: tenant, error: tenantError } = await supabase
       .from("microsoft_tenants")

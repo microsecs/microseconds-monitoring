@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeGoogleCode, googleLoginSample, googleDirectoryUsers, encryptGoogleSecret } from "@/lib/googleWorkspace";
-import { getSupabaseAdmin, getOrCreateDevOrganization } from "@/lib/supabaseAdmin";
+import { getSupabaseAdmin, requireWritableOrganization } from "@/lib/supabaseAdmin";
 import { markMonitoringHealthy } from "@/lib/monitoringHealth";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     // A valid empty report is possible. The connection is still valid, but a domain/customer
     // may not be discoverable until an event exists.
-    const org = await getOrCreateDevOrganization();
+    const org = await requireWritableOrganization();
     const supabase = getSupabaseAdmin();
 
     const displayName = primaryDomain || "Google Workspace";

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrCreateDevOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { requireWritableOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 type ReorderItem = { platform: "microsoft" | "google"; id: string; sortOrder: number };
 
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const items: ReorderItem[] = Array.isArray(body?.items) ? body.items : [];
     if (!items.length) return NextResponse.json({ error: "Tenant order is required." }, { status: 400 });
 
-    const org = await getOrCreateDevOrganization();
+    const org = await requireWritableOrganization();
     const sb = getSupabaseAdmin();
 
     for (const item of items) {

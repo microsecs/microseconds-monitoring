@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrCreateDevOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { requireWritableOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -9,7 +9,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     if (!displayName) return NextResponse.json({ error: "Tenant display name is required." }, { status: 400 });
 
     const sb = getSupabaseAdmin();
-    const org = await getOrCreateDevOrganization();
+    const org = await requireWritableOrganization();
     const { data, error } = await sb
       .from("google_workspace_tenants")
       .update({ display_name: displayName, updated_at: new Date().toISOString() })
@@ -27,7 +27,7 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
   try {
     const { id } = await context.params;
     const sb = getSupabaseAdmin();
-    const org = await getOrCreateDevOrganization();
+    const org = await requireWritableOrganization();
 
     const { data: tenant, error: tenantError } = await sb
       .from("google_workspace_tenants")

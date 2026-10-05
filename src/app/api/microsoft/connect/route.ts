@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { microsoftRedirectUri } from "@/lib/appUrl";
 
+import { requireWritableOrganization } from "@/lib/supabaseAdmin";
 export async function GET() {
+  try { await requireWritableOrganization(); } catch (e:any) { return NextResponse.json({error:e?.message||"Subscription required"},{status:402}); }
   const clientId = process.env.MICROSOFT_CLIENT_ID;
   const redirectUri = microsoftRedirectUri();
 

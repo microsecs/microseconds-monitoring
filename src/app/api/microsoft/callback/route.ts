@@ -4,7 +4,7 @@ import {
   getOrganizationProfile,
   getRecentSignIns,
 } from "@/lib/graph";
-import { getOrCreateDevOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { requireWritableOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 function isPermissionPropagationError(message: string) {
   const s = String(message || "").toLowerCase();
@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = getSupabaseAdmin();
-  const org = await getOrCreateDevOrganization();
+  const org = await requireWritableOrganization();
 
   const { data: existing, error: findError } = await supabase
     .from("microsoft_tenants")

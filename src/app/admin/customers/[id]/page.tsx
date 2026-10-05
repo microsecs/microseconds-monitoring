@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProductAdmin } from "@/lib/productAdmin";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { subscriptionState } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 function fmt(v?:string|null){if(!v)return "—";const d=new Date(v);return Number.isNaN(d.getTime())?"—":d.toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});}
@@ -19,7 +20,7 @@ export default async function CustomerDetail({params}:{params:Promise<{id:string
   db.from("signins").select("id",{count:"exact",head:true}).eq("organization_id",id).gte("event_time",since),
   db.from("security_incidents").select("id",{count:"exact",head:true}).eq("organization_id",id).gte("created_at",since)
  ]);
- if(orgR.error||!orgR.data)notFound(); const org:any=orgR.data; const members:any[]=memR.data||[];
+ if(orgR.error||!orgR.data)notFound(); const org:any=orgR.data; const sub=subscriptionState(org); const members:any[]=memR.data||[];
  const emailById=new Map<string,string>(); if(members.length){let page=1;while(page<=10){const {data}=await db.auth.admin.listUsers({page,perPage:1000});for(const u of data?.users||[])if(members.some(m=>m.user_id===u.id))emailById.set(u.id,u.email||"");if(!data?.users||data.users.length<1000)break;page++;}}
  const ms:any[]=msR.data||[], gs:any[]=gR.data||[];
  return <>
@@ -27,7 +28,7 @@ export default async function CustomerDetail({params}:{params:Promise<{id:string
   <div className="topbar"><div><div className="title">{org.name||org.slug||"Customer"}</div><div className="subtitle">Customer organization details and usage</div></div></div>
   <div className="grid4 adminMetrics">
    <div className="card"><div className="label">Plan</div><div className="adminValue">{org.plan||"—"}</div></div>
-   <div className="card"><div className="label">Subscription</div><div className="adminValue"><span className={`pill ${pill(org.subscription_status)}`}>{org.subscription_status||"inactive"}</span></div></div>
+   <div className="card"><div className="label">Subscription</div><div className="adminValue"><span className={`pill ${pill(org.subscription_status)}`}>{sub.status}</span></div></div>
    <div className="card"><div className="label">Automatic Monitoring</div><div className="adminValue"><span className={`pill ${monR.data?.automatic_monitoring_enabled?"normal":"review"}`}>{monR.data?.automatic_monitoring_enabled?"Enabled":"Off"}</span></div></div>
    <div className="card"><div className="label">Customer Since</div><div className="adminValue">{fmt(org.created_at)}</div></div>
   </div>
@@ -39,7 +40,7 @@ export default async function CustomerDetail({params}:{params:Promise<{id:string
   </div>
   <div className="adminDetailGrid">
    <div className="section card"><h2>Users</h2><table className="table"><thead><tr><th>Email</th><th>Role</th></tr></thead><tbody>{members.map(m=><tr key={m.user_id}><td>{emailById.get(m.user_id)||"—"}</td><td><span className="pill normal">{m.role}</span></td></tr>)}</tbody></table></div>
-   <div className="section card"><h2>Billing Profile</h2><div className="adminInfoRows"><div><span>Plan</span><strong>{org.plan||"—"}</strong></div><div><span>Status</span><strong>{org.subscription_status||"inactive"}</strong></div><div><span>Trial ends</span><strong>{fmt(org.trial_ends_at)}</strong></div><div><span>Organization ID</span><strong className="adminMono">{org.id}</strong></div></div><div className="adminComingSoon">Stripe customer, renewal and revenue information will appear here after billing is connected.</div></div>
+   <div className="section card"><h2>Billing Profile</h2><div className="adminInfoRows"><div><span>Plan</span><strong>{org.plan||"—"}</strong></div><div><span>Status</span><strong>{sub.status}</strong></div><div><span>Trial started</span><strong>{fmt(org.trial_started_at)}</strong></div><div><span>Trial ends</span><strong>{fmt(org.trial_ends_at)}</strong></div><div><span>Organization ID</span><strong className="adminMono">{org.id}</strong></div></div><div className="adminComingSoon">Stripe customer, renewal and revenue information will appear here after billing is connected.</div></div>
   </div>
   <div className="section card"><h2>Connected Tenants</h2><div className="tableScroll"><table className="table"><thead><tr><th>Platform</th><th>Tenant</th><th>Status</th><th>Automatic Capability</th><th>Last Sync</th></tr></thead><tbody>
    {ms.map(t=><tr key={`m-${t.id}`}><td>Microsoft 365</td><td>{t.tenant_name||t.tenant_id}</td><td><span className={`pill ${pill(t.connection_status||"connected")}`}>{t.connection_status||"Connected"}</span></td><td>{t.automatic_monitoring_available===true?"Available":"CSV / unavailable"}</td><td>{fmt(t.last_sync_at)}</td></tr>)}

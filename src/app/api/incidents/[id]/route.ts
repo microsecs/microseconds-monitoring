@@ -1,5 +1,5 @@
 import {NextRequest,NextResponse} from "next/server";
-import {getOrCreateDevOrganization,getSupabaseAdmin} from "@/lib/supabaseAdmin";
+import {requireWritableOrganization,getSupabaseAdmin} from "@/lib/supabaseAdmin";
 
 const allowed=new Set(["open","investigating","safe","confirmed_suspicious","dismissed"]);
 
@@ -10,7 +10,7 @@ export async function PATCH(req:NextRequest,context:{params:Promise<{id:string}>
     const status=String(body?.status||"");
     if(!allowed.has(status)) return NextResponse.json({error:"Invalid incident status."},{status:400});
 
-    const org=await getOrCreateDevOrganization();
+    const org=await requireWritableOrganization();
     const supabase=getSupabaseAdmin();
     const {data,error}=await supabase.from("security_incidents")
       .update({status,updated_at:new Date().toISOString()})

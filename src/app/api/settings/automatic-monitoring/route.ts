@@ -1,5 +1,5 @@
 import {NextRequest,NextResponse} from "next/server";
-import {getOrCreateDevOrganization,getSupabaseAdmin} from "@/lib/supabaseAdmin";
+import {getOrCreateDevOrganization,requireWritableOrganization,getSupabaseAdmin} from "@/lib/supabaseAdmin";
 
 export async function GET(){
  try{
@@ -13,7 +13,7 @@ export async function GET(){
 
 export async function POST(req:NextRequest){
  try{
-  const org=await getOrCreateDevOrganization(),body=await req.json();
+  const org=await requireWritableOrganization(),body=await req.json();
   const enabled=body?.enabled===true;
   const {data,error}=await getSupabaseAdmin().from("organization_notification_settings")
    .upsert({organization_id:org.id,automatic_monitoring_enabled:enabled,updated_at:new Date().toISOString()},{onConflict:"organization_id"})

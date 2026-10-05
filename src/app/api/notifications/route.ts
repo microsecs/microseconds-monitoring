@@ -1,5 +1,5 @@
 import {NextRequest,NextResponse} from "next/server";
-import {getOrCreateDevOrganization,getSupabaseAdmin} from "@/lib/supabaseAdmin";
+import {getOrCreateDevOrganization,requireWritableOrganization,getSupabaseAdmin} from "@/lib/supabaseAdmin";
 import {getOrganizationNotificationSettings} from "@/lib/notificationSettings";
 function parseEmails(value:unknown){return Array.from(new Set(String(value||"").split(/[\n,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean)));}
 export async function GET(){
@@ -8,7 +8,7 @@ export async function GET(){
 }
 export async function POST(req:NextRequest){
  try{
-  const b=await req.json(),org=await getOrCreateDevOrganization();
+  const b=await req.json(),org=await requireWritableOrganization();
   const row={organization_id:org.id,enabled:b?.enabled!==false,alert_emails:parseEmails(b?.alertEmails),
    alert_successful_suspicious:b?.alertSuccessfulSuspicious!==false,alert_failed_suspicious:false,
    min_risk_score:Math.max(0,Math.min(100,Number(b?.minRiskScore??50))),

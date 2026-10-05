@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import net from "node:net";
-import { getOrCreateDevOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { requireWritableOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 type Incoming = {
   time?: string;
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getSupabaseAdmin();
-    const org = await getOrCreateDevOrganization();
+    const org = await requireWritableOrganization();
 
     const { data: tenant, error: tenantError } = await supabase
       .from("microsoft_tenants")

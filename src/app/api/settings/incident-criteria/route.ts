@@ -1,5 +1,5 @@
 import { NextRequest,NextResponse } from "next/server";
-import { getOrCreateDevOrganization,getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { getOrCreateDevOrganization,requireWritableOrganization,getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { DEFAULT_INCIDENT_CRITERIA,getIncidentCriteria } from "@/lib/incidentCriteria";
 export async function GET(){
  try{const org=await getOrCreateDevOrganization();return NextResponse.json({settings:await getIncidentCriteria(org.id),defaults:DEFAULT_INCIDENT_CRITERIA});}
@@ -7,7 +7,7 @@ export async function GET(){
 }
 export async function PUT(req:NextRequest){
  try{
-  const org=await getOrCreateDevOrganization(),b=await req.json(),v:any={};
+  const org=await requireWritableOrganization(),b=await req.json(),v:any={};
   for(const k of Object.keys(DEFAULT_INCIDENT_CRITERIA)){
    const def=(DEFAULT_INCIDENT_CRITERIA as any)[k];
    if(typeof def==="boolean")v[k]=Boolean(b[k]);

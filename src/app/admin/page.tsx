@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireProductAdmin } from "@/lib/productAdmin";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { subscriptionState } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -60,13 +61,14 @@ export default async function ProductAdminPage() {
     const orgIncidents = incidents.filter(x => x.organization_id === org.id);
     const mon = monitoring.find(x => x.organization_id === org.id);
     const syncDates = [...ms, ...gs].map(x => x.last_sync_at).filter(Boolean).sort().reverse();
-    return { org, ownerEmail: owner ? emailByUser.get(owner.user_id) || "—" : "—", users: orgMembers.length, tenants: ms.length + gs.length, monitoring: mon?.automatic_monitoring_enabled === true, signins: orgSignins.length, incidents: orgIncidents.length, lastSync: syncDates[0] || null };
+    const sub=subscriptionState(org);
+    return { org, sub, ownerEmail: owner ? emailByUser.get(owner.user_id) || "—" : "—", users: orgMembers.length, tenants: ms.length + gs.length, monitoring: mon?.automatic_monitoring_enabled === true, signins: orgSignins.length, incidents: orgIncidents.length, lastSync: syncDates[0] || null };
   });
 
   const connectedTenants = microsoft.length + google.length;
   const monitoringOrgs = new Set(monitoring.filter(x => x.automatic_monitoring_enabled === true).map(x => x.organization_id)).size;
   const activeStatuses = new Set(["active", "trialing"]);
-  const activeCustomers = organizations.filter(x => activeStatuses.has(String(x.subscription_status || "").toLowerCase())).length;
+  const activeCustomers = organizations.filter(x => activeStatuses.has(subscriptionState(x).status)).length;
 
   return <>
     <div className="topbar"><div><div className="title">Product Admin</div><div className="subtitle">MicroSECONDS Monitoring customer and usage overview</div></div></div>
@@ -84,8 +86,8 @@ export default async function ProductAdminPage() {
     </div>
     <div className="section card">
       <div className="adminTableHeader"><div><h2>Customers</h2><div className="muted">Organizations, account ownership, monitoring and recent usage</div></div></div>
-      {rows.length ? <div className="tableScroll"><table className="table adminCustomerTable"><thead><tr><th>Organization</th><th>Owner</th><th>Plan</th><th>Status</th><th>Tenants</th><th>Users</th><th>Monitoring</th><th>30d Sign-ins</th><th>30d Incidents</th><th>Last Sync</th></tr></thead><tbody>
-        {rows.map(r => <tr key={r.org.id}><td><Link className="adminCustomerLink" href={`/admin/customers/${r.org.id}`}>{r.org.name || r.org.slug || "Organization"}</Link></td><td>{r.ownerEmail}</td><td>{r.org.plan || "—"}</td><td><span className={`pill ${statusClass(r.org.subscription_status)}`}>{r.org.subscription_status || "inactive"}</span></td><td>{r.tenants}</td><td>{r.users}</td><td><span className={`pill ${r.monitoring ? "normal" : "review"}`}>{r.monitoring ? "Enabled" : "Off"}</span></td><td>{r.signins.toLocaleString()}</td><td>{r.incidents.toLocaleString()}</td><td>{fmtDate(r.lastSync)}</td></tr>)}
+      {rows.length ? <div className="tableScroll"><table className="table adminCustomerTable"><thead><tr><th>Organization</th><th>Owner</th><th>Plan</th><th>Status</th><th>Trial Ends</th><th>Tenants</th><th>Users</th><th>Monitoring</th><th>30d Sign-ins</th><th>30d Incidents</th><th>Last Sync</th></tr></thead><tbody>
+        {rows.map(r => <tr key={r.org.id}><td><Link className="adminCustomerLink" href={`/admin/customers/${r.org.id}`}>{r.org.name || r.org.slug || "Organization"}</Link></td><td>{r.ownerEmail}</td><td>{r.org.plan || "—"}</td><td><span className={`pill ${statusClass(r.sub.status)}`}>{r.sub.status}</span></td><td>{r.org.trial_ends_at ? fmtDate(r.org.trial_ends_at) : "—"}</td><td>{r.tenants}</td><td>{r.users}</td><td><span className={`pill ${r.monitoring ? "normal" : "review"}`}>{r.monitoring ? "Enabled" : "Off"}</span></td><td>{r.signins.toLocaleString()}</td><td>{r.incidents.toLocaleString()}</td><td>{fmtDate(r.lastSync)}</td></tr>)}
       </tbody></table></div> : <div className="empty">No customer organizations found.</div>}
     </div>
   </>;

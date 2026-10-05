@@ -3,6 +3,7 @@ import Link from "next/link";
 import IncidentsNavLink from "@/components/IncidentsNavLink";
 import AuthControls from "@/components/AuthControls";
 import ProductAdminNavLink from "@/components/ProductAdminNavLink";
+import TrialStatusBanner from "@/components/TrialStatusBanner";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 
 export const metadata = {
@@ -43,6 +44,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </header>
         )}
         <div className="appShell">
+          {user && <TrialStatusBanner/>}
           <main className="main">{children}</main>
           {user && (
             <footer className="siteFooter">

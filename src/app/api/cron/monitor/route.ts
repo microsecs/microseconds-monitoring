@@ -4,6 +4,7 @@ import {getSupabaseAdmin} from "@/lib/supabaseAdmin";
 import {syncMicrosoftTenant} from "@/lib/graphSync";
 import {syncGoogleWorkspaceTenant} from "@/lib/googleSync";
 import {processProviderIncidents} from "@/lib/incidents";
+import {subscriptionState} from "@/lib/subscription";
 
 export const maxDuration = 300;
 
@@ -16,7 +17,12 @@ async function runMonitor(req:NextRequest){
   const {data:settings,error:settingsError}=await db.from("organization_notification_settings")
    .select("organization_id,automatic_monitoring_enabled").eq("automatic_monitoring_enabled",true);
   if(settingsError)throw settingsError;
-  const organizationIds=[...new Set((settings||[]).map((x:any)=>x.organization_id).filter(Boolean))];
+  const candidateOrganizationIds=[...new Set((settings||[]).map((x:any)=>x.organization_id).filter(Boolean))];
+  const {data:orgRows,error:orgError}=candidateOrganizationIds.length
+    ? await db.from("organizations").select("id,plan,subscription_status,trial_started_at,trial_ends_at").in("id",candidateOrganizationIds)
+    : {data:[],error:null};
+  if(orgError)throw orgError;
+  const organizationIds=(orgRows||[]).filter((org:any)=>subscriptionState(org).writable).map((org:any)=>org.id);
   const allResults:any[]=[]; const retentionResults:any[]=[];
 
   for(const organizationId of organizationIds){
@@ -46,7 +52,7 @@ async function runMonitor(req:NextRequest){
    }
    retentionResults.push({organizationId,...await enforceSignInRetention(organizationId)});
   }
-  return NextResponse.json({ok:true,organizationsProcessed:organizationIds.length,results:allResults,retention:retentionResults});
+  return NextResponse.json({ok:true,organizationsProcessed:organizationIds.length,organizationsSkippedForSubscription:candidateOrganizationIds.length-organizationIds.length,results:allResults,retention:retentionResults});
  }catch(e:any){return NextResponse.json({error:e?.message||"Automatic monitoring failed"},{status:500});}
 }
 
