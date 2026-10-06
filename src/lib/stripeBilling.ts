@@ -24,8 +24,27 @@ export async function stripePost(path:string,body:Record<string,any>){
   return data;
 }
 
-export async function createStripeCustomer(email:string,organizationId:string,organizationName:string){
-  return stripePost("/customers",{email,name:organizationName||undefined,metadata:{organization_id:organizationId,product:"MicroSECONDS Monitoring"}});
+export async function stripeGet(path:string){
+  const secret=process.env.STRIPE_SECRET_KEY;
+  if(!secret)throw new Error("Stripe is not configured.");
+  const res=await fetch(`${STRIPE_API}${path}`,{headers:{Authorization:`Bearer ${secret}`},cache:"no-store"});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error(data?.error?.message||`Stripe request failed (${res.status}).`);
+  return data;
+}
+
+export async function createStripeCustomer(email:string,organizationId:string,organizationName:string,accountName?:string){
+  const genericDomains=new Set(["gmail.com","yahoo.com","outlook.com","hotmail.com","icloud.com","aol.com","live.com","msn.com","proton.me","protonmail.com"]);
+  const normalizedOrg=String(organizationName||"").trim();
+  const normalizedAccount=String(accountName||"").trim();
+  const customerName=normalizedOrg && !genericDomains.has(normalizedOrg.toLowerCase())
+    ? normalizedOrg
+    : normalizedAccount || (email ? email.split("@")[0] : "MicroSECONDS Monitoring Customer");
+  return stripePost("/customers",{email,name:customerName,metadata:{organization_id:organizationId,organization_name:normalizedOrg||customerName,product:"MicroSECONDS Monitoring"}});
+}
+
+export async function retrieveStripeSubscription(subscriptionId:string){
+  return stripeGet(`/subscriptions/${encodeURIComponent(subscriptionId)}`);
 }
 
 export async function createCheckoutSession(args:{customerId:string;organizationId:string}){

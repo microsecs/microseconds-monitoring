@@ -10,7 +10,7 @@ export async function POST(){
   const {data:member}=await db.from("organization_members").select("role").eq("organization_id",org.id).eq("user_id",user.id).maybeSingle();
   if(member?.role!=="owner")return NextResponse.json({error:"Only the organization owner can manage billing."},{status:403});
   let customerId=org.stripe_customer_id as string|undefined;
-  if(!customerId){const customer=await createStripeCustomer(user.email||"",org.id,org.name||"");customerId=customer.id;await db.from("organizations").update({stripe_customer_id:customerId,subscription_updated_at:new Date().toISOString()}).eq("id",org.id);}
+  if(!customerId){const accountName=String(user.user_metadata?.full_name||user.user_metadata?.name||"").trim();const customer=await createStripeCustomer(user.email||"",org.id,org.name||"",accountName);customerId=customer.id;await db.from("organizations").update({stripe_customer_id:customerId,subscription_updated_at:new Date().toISOString()}).eq("id",org.id);}
   if(!customerId)throw new Error("Could not create Stripe customer.");
   const session=await createCheckoutSession({customerId,organizationId:org.id});
   return NextResponse.json({url:session.url});
