@@ -219,3 +219,5 @@ body{min-height:100vh}
 .accountPasswordForm{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 18px;align-items:end}
 .accountPasswordForm .button{grid-column:1/-1;width:max-content}
 @media(max-width:760px){.accountTopGrid,.accountBillingDetails,.accountPasswordForm{grid-template-columns:1fr}.accountPasswordForm .button{grid-column:auto}}
+.accountTopGrid>.accountCard{height:100%;box-sizing:border-box}
+.accountSecurityGrid{align-items:stretch}
