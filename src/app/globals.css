@@ -197,3 +197,25 @@ body{min-height:100vh}
 /* Trial / subscription status */
 .trialBanner{margin:14px 22px 0;width:calc(100% - 44px);box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:11px 14px;border:1px solid rgba(45,212,191,.35);background:rgba(20,184,166,.10);border-radius:10px;color:#d9fffa}.trialBanner>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.trialBanner strong{font-size:13px}.trialBanner span{font-size:12px;color:#a7c7c3}.trialBannerAction{display:inline-flex;align-items:center;justify-content:center;padding:7px 11px;border-radius:7px;background:#0f766e;color:#fff;text-decoration:none;font-size:12px;font-weight:700;white-space:nowrap}.trialBannerUrgent{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.10)}.trialBannerUrgent .trialBannerAction{background:#b45309}.trialBannerExpired{border-color:rgba(239,68,68,.42);background:rgba(239,68,68,.10)}.trialBannerExpired .trialBannerAction{background:#b91c1c}@media(max-width:700px){.trialBanner{margin-left:16px;margin-right:16px;width:calc(100% - 32px);align-items:flex-start}.trialBanner>div{display:block}.trialBanner span{display:block;margin-top:3px}}
 .accountBillingState{font-size:15px;font-weight:700;margin:8px 0}.accountBillingNote{margin-top:8px}
+
+/* Account page full-width hierarchy */
+.accountPageStack{display:flex;flex-direction:column;gap:18px;width:100%;max-width:none}
+.accountTopGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;width:100%}
+.accountFullCard{width:100%;box-sizing:border-box}
+.accountStatus{max-width:none;width:100%;box-sizing:border-box}
+.accountStatusRow{margin-bottom:12px}
+.accountStateBadge{display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid;border-radius:999px;font-size:12px;font-weight:900;text-transform:capitalize}
+.accountStateDot,.mfaDisabledDot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.accountStateGood{color:#a7f3d0;background:rgba(16,185,129,.10);border-color:rgba(52,211,153,.38)}
+.accountStateGood .accountStateDot{background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.10)}
+.accountStateBad{color:#fecaca;background:rgba(239,68,68,.10);border-color:rgba(248,113,113,.40)}
+.accountStateBad .accountStateDot{background:#f87171;box-shadow:0 0 0 4px rgba(248,113,113,.10)}
+.accountBillingButton{margin-top:14px}
+.accountBillingDetails{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.accountInlineStatus{font-size:15px;font-weight:800;margin-top:8px}
+.accountInlineGood{color:#a7f3d0}.accountInlineBad{color:#fecaca}
+.mfaDisabled{color:#fecaca}.mfaDisabledDot{background:#f87171;box-shadow:0 0 0 4px rgba(248,113,113,.10)}
+.accountNarrowForm{max-width:420px}
+.accountPasswordForm{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 18px;align-items:end}
+.accountPasswordForm .button{grid-column:1/-1;width:max-content}
+@media(max-width:760px){.accountTopGrid,.accountBillingDetails,.accountPasswordForm{grid-template-columns:1fr}.accountPasswordForm .button{grid-column:auto}}
