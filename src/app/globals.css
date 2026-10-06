@@ -221,3 +221,16 @@ body{min-height:100vh}
 @media(max-width:760px){.accountTopGrid,.accountBillingDetails,.accountPasswordForm{grid-template-columns:1fr}.accountPasswordForm .button{grid-column:auto}}
 .accountTopGrid>.accountCard{height:100%;box-sizing:border-box}
 .accountSecurityGrid{align-items:stretch}
+
+/* Product Admin automatic-monitoring diagnostic */
+.adminMonitorRunning{display:flex;align-items:center;gap:8px;margin-top:14px;color:#cbd5e1}
+.adminMonitorSummary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}
+.adminMonitorSummary>div{padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#0d1726}
+.adminMonitorSummary span{display:block;color:var(--muted);font-size:12px;margin-bottom:5px}
+.adminMonitorSummary strong{font-size:20px}
+.adminMonitorGood{color:var(--good)}.adminMonitorBad{color:var(--danger)}
+.adminMonitorMeta{margin-top:12px;font-size:12px}
+.adminMonitorSuccess{margin-top:14px;padding:10px 12px;border:1px solid #166534;border-radius:9px;background:#0d2b1a;color:#bbf7d0}
+.adminMonitorFailures{margin-top:14px;padding:10px 12px;border:1px solid #7f1d1d;border-radius:9px;background:#2a1014;color:#fecaca}
+.adminMonitorFailures>div{margin-top:6px;font-size:13px}
+@media(max-width:700px){.adminMonitorSummary{grid-template-columns:repeat(2,minmax(0,1fr))}.adminTableHeader{gap:12px;flex-wrap:wrap}}

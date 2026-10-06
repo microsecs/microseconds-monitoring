@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireProductAdmin } from "@/lib/productAdmin";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { subscriptionState } from "@/lib/subscription";
+import RunMonitoringNow from "@/components/RunMonitoringNow";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,7 @@ export default async function ProductAdminPage() {
       <div className="card"><div className="label">Incidents · 30 Days</div><div className="metric">{incidents.length.toLocaleString()}</div></div>
       <div className="card"><div className="label">Avg. Tenants / Customer</div><div className="metric">{organizations.length ? (connectedTenants / organizations.length).toFixed(1) : "0.0"}</div></div>
     </div>
+    <RunMonitoringNow />
     <div className="section card">
       <div className="adminTableHeader"><div><h2>Customers</h2><div className="muted">Organizations, account ownership, monitoring and recent usage</div></div></div>
       {rows.length ? <div className="tableScroll"><table className="table adminCustomerTable"><thead><tr><th>Organization</th><th>Owner</th><th>Plan</th><th>Status</th><th>Trial Ends</th><th>Tenants</th><th>Users</th><th>Monitoring</th><th>30d Sign-ins</th><th>30d Incidents</th><th>Last Sync</th></tr></thead><tbody>
