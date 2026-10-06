@@ -80,3 +80,16 @@ export function appSubscriptionStatus(stripeStatus?:string|null){
   if(s==="canceled")return "canceled";
   return "inactive";
 }
+
+export async function findMonitoringSubscriptionForCustomer(customerId:string){
+  const configuredPrice=process.env.STRIPE_PRICE_ID||"";
+  const result=await stripeGet(`/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=100`);
+  const subscriptions=Array.isArray(result?.data)?result.data:[];
+  const matching=subscriptions.filter((sub:any)=>{
+    const items=Array.isArray(sub?.items?.data)?sub.items.data:[];
+    return !configuredPrice || items.some((item:any)=>item?.price?.id===configuredPrice);
+  });
+  const rank=(status:string)=>({active:0,trialing:1,past_due:2,unpaid:3,incomplete:4,incomplete_expired:5,canceled:6}[String(status||"").toLowerCase()]??99);
+  matching.sort((a:any,b:any)=>rank(a?.status)-rank(b?.status)||(Number(b?.created)||0)-(Number(a?.created)||0));
+  return matching[0]||null;
+}
