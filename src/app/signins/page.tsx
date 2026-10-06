@@ -1,26 +1,8 @@
 import { getRecentHistoryPage, getTenants, getGoogleTenants } from "@/lib/history";
 import TenantSignInFilter from "./TenantSignInFilter";
+import LocalDateTime from "@/components/LocalDateTime";
 
 export const dynamic = "force-dynamic";
-
-function dateLabel(value: any) {
-  if (!value) return "—";
-  const d = new Date(value);
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function timeLabel(value: any) {
-  if (!value) return "";
-  const d = new Date(value);
-  return d.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 function cleanRiskReasons(input:any[] = []) {
   const out:string[] = [];
@@ -204,10 +186,10 @@ export default async function SigninsPage({
                   }
                 >
                   <td className="nowrap" style={{ verticalAlign: "middle" }}>
-                    <strong>{dateLabel(r.event_time)}</strong>
+                    <strong><LocalDateTime value={r.event_time} mode="date" /></strong>
                     {r.event_time ? (
                       <div className="subtitle" style={{ marginTop: 2 }}>
-                        {timeLabel(r.event_time)}
+                        <LocalDateTime value={r.event_time} mode="time" />
                       </div>
                     ) : null}
                   </td>

@@ -2,8 +2,8 @@ import IncidentActions from "./IncidentActions";
 import DismissAllButton from "./DismissAllButton";
 import {getIncidentQueuePage} from "@/lib/incidents";
 import IncidentStatusPopup from "./IncidentStatusPopup";
+import LocalDateTime from "@/components/LocalDateTime";
 export const dynamic="force-dynamic";
-function date(v:any){return v?new Date(v).toLocaleString():"Unknown time";}
 function cleanRiskReasons(input:any[] = []) {
   const out:string[] = [];
   const seen = new Set<string>();
@@ -92,7 +92,7 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
        {success?<span className="pill normal">SUCCESSFUL SIGN-IN</span>:null}<span className="pill">{String(row.status||"open").replaceAll("_"," ").toUpperCase()}</span>
        {row.alerted_at?<span className="pill">ALERT SENT</span>:null}
       </div>
-      <h2 style={{marginBottom:5,fontSize:20}}>{row.title}</h2><div className="subtitle">{row.tenant_name} · {platform} · {date(s.event_time||row.created_at)}</div></div>
+      <h2 style={{marginBottom:5,fontSize:20}}>{row.title}</h2><div className="subtitle">{row.tenant_name} · {platform} · <LocalDateTime value={s.event_time||row.created_at} fallback="Unknown time" /></div></div>
       <div style={{textAlign:"right"}}><div className="subtitle">Risk Score</div><div style={{fontSize:26,fontWeight:700}}>{row.risk_score}/100</div></div>
      </div>
      <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",columnGap:28,rowGap:16,marginTop:18}}>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LocalDateTime from "@/components/LocalDateTime";
 import { getDevOrganization, getRecentHistoryPage } from "@/lib/history";
 
 export const dynamic = "force-dynamic";
@@ -183,9 +184,7 @@ export default async function DashboardPage() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {r.event_time
-                      ? new Date(r.event_time).toLocaleString()
-                      : "—"}
+                    <LocalDateTime value={r.event_time} />
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #eee" }}>
                     {r.user_principal_name || "—"}
