@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { getSupabaseAdmin, getOrCreateDevOrganization } from "@/lib/supabaseAdmin";
 import { createIncidentAnalysis } from "@/lib/aiIncident";
 import { sendIncidentAlerts } from "@/lib/emailAlerts";
 import { getEffectiveNotificationSettings, getOrganizationNotificationSettings } from "@/lib/notificationSettings";
@@ -174,9 +174,11 @@ export async function processTenantIncidents(x:{organizationId:string;microsoftT
 }
 
 export async function getIncidentQueuePage(opts:{page?:number;pageSize?:number;includeDismissed?:boolean;includeFailed?:boolean;search?:string}={}){
- const db=getSupabaseAdmin(),slug=process.env.DEV_ORGANIZATION_SLUG||"microseconds-dev";
+ const db=getSupabaseAdmin();
  const page=Math.max(1,opts.page||1),pageSize=Math.min(250,Math.max(25,opts.pageSize||100));
- const {data:o}=await db.from("organizations").select("id").eq("slug",slug).maybeSingle();
+ // Resolve the organization from the authenticated user's membership. The admin client
+ // bypasses RLS, so every customer-facing incident query must explicitly carry this ID.
+ const o:any=await getOrCreateDevOrganization();
  if(!o)return {rows:[],total:0,page,pageSize};
 
  // We must apply the failed-login filter BEFORE pagination. security_incidents does not
@@ -220,8 +222,8 @@ export async function getIncidentQueuePage(opts:{page?:number;pageSize?:number;i
  const mts:any[]=[],gts:any[]=[],intel:any[]=[];
  const mtids=uniq(incidents.map((i:any)=>i.microsoft_tenant_id).filter(Boolean)) as string[];
  const gtids=uniq(incidents.map((i:any)=>i.google_workspace_tenant_id).filter(Boolean)) as string[];
- for(let i=0;i<mtids.length;i+=40){const {data}=await db.from("microsoft_tenants").select("id,tenant_name,tenant_id").in("id",mtids.slice(i,i+40));mts.push(...(data||[]));}
- for(let i=0;i<gtids.length;i+=40){const {data}=await db.from("google_workspace_tenants").select("id,display_name,primary_domain").in("id",gtids.slice(i,i+40));gts.push(...(data||[]));}
+ for(let i=0;i<mtids.length;i+=40){const {data}=await db.from("microsoft_tenants").select("id,tenant_name,tenant_id").eq("organization_id",o.id).in("id",mtids.slice(i,i+40));mts.push(...(data||[]));}
+ for(let i=0;i<gtids.length;i+=40){const {data}=await db.from("google_workspace_tenants").select("id,display_name,primary_domain").eq("organization_id",o.id).in("id",gtids.slice(i,i+40));gts.push(...(data||[]));}
  const ips=uniq(pageSs.map((s:any)=>String(s.ip_address||"")).filter(Boolean)) as string[];
  for(let i=0;i<ips.length;i+=40){const {data}=await db.from("ip_intelligence").select("ip_address,provider,asn,city,region,country,country_code,is_vpn,is_proxy,is_tor,is_relay,is_hosting,privacy_service,privacy_available").in("ip_address",ips.slice(i,i+40));intel.push(...(data||[]));}
  const im=new Map(intel.map((x:any)=>[String(x.ip_address),x]));

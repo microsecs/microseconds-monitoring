@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { getSupabaseAdmin, getOrCreateDevOrganization } from "@/lib/supabaseAdmin";
 
 export type HistoryRow = {
   id: string;
@@ -40,17 +40,10 @@ export type HistoryRow = {
 };
 
 export async function getDevOrganization() {
-  const supabase = getSupabaseAdmin();
-  const slug = process.env.DEV_ORGANIZATION_SLUG || "microseconds-dev";
-
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("id,name,slug")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
-  return data;
+  // Legacy function name retained for callers, but customer-facing history must always
+  // resolve from the authenticated user's organization membership. Never fall back to
+  // DEV_ORGANIZATION_SLUG here: the admin service-role client bypasses RLS.
+  return getOrCreateDevOrganization();
 }
 
 export async function getGoogleTenants() {
@@ -167,6 +160,7 @@ export async function getRecentHistoryPage(opts:{
       const { data: incidents, error: ierr } = await supabase
         .from("security_incidents")
         .select("signin_id,risk_score,reasons")
+        .eq("organization_id", org.id)
         .in("signin_id", ids.slice(i, i + 40));
       if (ierr) throw new Error(ierr.message);
       incidentRows.push(...(incidents || []));
@@ -180,6 +174,7 @@ export async function getRecentHistoryPage(opts:{
   for (let i = 0; i < tenantIds.length; i += 40) {
     const { data, error } = await supabase.from("security_incidents")
       .select("signin_id,risk_score,reasons,microsoft_tenant_id,google_workspace_tenant_id")
+      .eq("organization_id", org.id)
       .in("microsoft_tenant_id", tenantIds.slice(i, i + 40));
     if (error) throw new Error(error.message);
     candidateIncidents.push(...(data || []));
@@ -187,6 +182,7 @@ export async function getRecentHistoryPage(opts:{
   for (let i = 0; i < googleTenantIds.length; i += 40) {
     const { data, error } = await supabase.from("security_incidents")
       .select("signin_id,risk_score,reasons,microsoft_tenant_id,google_workspace_tenant_id")
+      .eq("organization_id", org.id)
       .in("google_workspace_tenant_id", googleTenantIds.slice(i, i + 40));
     if (error) throw new Error(error.message);
     candidateIncidents.push(...(data || []));
