@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { getSupabaseAdmin, getOrCreateDevOrganization } from "@/lib/supabaseAdmin";
 import { getIpIntel, mapLimit } from "@/lib/graphSync";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +12,13 @@ export async function POST(
   try {
     const { id } = await params;
     const sb = getSupabaseAdmin();
+    const org = await getOrCreateDevOrganization();
 
     const { data: tenant, error: tenantError } = await sb
       .from("google_workspace_tenants")
       .select("id,organization_id")
       .eq("id", id)
+      .eq("organization_id", org.id)
       .single();
 
     if (tenantError || !tenant) {
