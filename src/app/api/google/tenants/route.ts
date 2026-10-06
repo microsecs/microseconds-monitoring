@@ -13,7 +13,10 @@ export async function GET() {
       .eq("organization_id", org.id)
       .order("sort_order", { ascending: true, nullsFirst: false }).order("created_at", { ascending: false }));
     if (error) throw error;
-    return NextResponse.json({ tenants: data || [] });
+    const ids=(data || []).map((t:any)=>t.id);
+    const {data:locks}=ids.length ? await supabase.from("tenant_sync_locks").select("tenant_id,expires_at").eq("organization_id",org.id).eq("provider","google").in("tenant_id",ids).gt("expires_at",new Date().toISOString()) : {data:[] as any[]};
+    const syncing=new Set((locks || []).map((x:any)=>x.tenant_id));
+    return NextResponse.json({ tenants: (data || []).map((t:any)=>({...t,sync_in_progress:syncing.has(t.id)})) });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Unable to load Google tenants", tenants: [] }, { status: 500 });
   }

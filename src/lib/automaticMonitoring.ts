@@ -4,6 +4,7 @@ import { syncMicrosoftTenant } from "@/lib/graphSync";
 import { syncGoogleWorkspaceTenant } from "@/lib/googleSync";
 import { processProviderIncidents } from "@/lib/incidents";
 import { subscriptionState } from "@/lib/subscription";
+import { acquireTenantSyncLock, releaseTenantSyncLock } from "@/lib/syncLock";
 
 export async function runAutomaticMonitoring() {
   const startedAt = new Date();
@@ -31,6 +32,8 @@ export async function runAutomaticMonitoring() {
     if (g.error) throw g.error;
 
     for (const tenant of m.data || []) {
+      const lockToken = await acquireTenantSyncLock("microsoft", tenant.id, organizationId);
+      if (!lockToken) { results.push({ organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: true, skipped: true, reason: "Sync already in progress" }); continue; }
       try {
         const sync = await syncMicrosoftTenant({ organizationId, microsoftTenantRecordId: tenant.id, microsoftTenantId: tenant.tenant_id });
         const incidents = await processProviderIncidents({
@@ -40,10 +43,12 @@ export async function runAutomaticMonitoring() {
         results.push({ organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: true, ...sync, incidentsCreated: incidents.created, alertsSent: incidents.alerted });
       } catch (e: any) {
         results.push({ organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: false, error: e?.message || "Automatic sync failed" });
-      }
+      } finally { await releaseTenantSyncLock("microsoft", tenant.id, lockToken); }
     }
 
     for (const tenant of g.data || []) {
+      const lockToken = await acquireTenantSyncLock("google", tenant.id, organizationId);
+      if (!lockToken) { results.push({ organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: true, skipped: true, reason: "Sync already in progress" }); continue; }
       try {
         const previousLastSync = tenant.last_sync_at || undefined;
         const sync = await syncGoogleWorkspaceTenant(tenant);
@@ -54,7 +59,7 @@ export async function runAutomaticMonitoring() {
         results.push({ organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: true, ...sync, incidentsCreated: incidents.created, alertsSent: incidents.alerted });
       } catch (e: any) {
         results.push({ organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: false, error: e?.message || "Automatic sync failed" });
-      }
+      } finally { await releaseTenantSyncLock("google", tenant.id, lockToken); }
     }
     retention.push({ organizationId, ...await enforceSignInRetention(organizationId) });
   }

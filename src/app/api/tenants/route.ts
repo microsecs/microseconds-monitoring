@@ -32,11 +32,15 @@ export async function GET() {
       }
     }
 
+    const ids = tenants.map((t:any)=>t.id);
+    const { data: locks } = ids.length ? await supabase.from("tenant_sync_locks").select("tenant_id,expires_at").eq("organization_id",org.id).eq("provider","microsoft").in("tenant_id",ids).gt("expires_at",new Date().toISOString()) : { data: [] as any[] };
+    const syncing = new Set((locks || []).map((x:any)=>x.tenant_id));
     return NextResponse.json({
       organization: { id: org.id, name: org.name },
       tenants: tenants.map((t: any) => ({
         ...t,
         last_csv_import_at: latestImport.get(t.id) || null,
+        sync_in_progress: syncing.has(t.id),
       })),
     });
   } catch (e: any) {

@@ -7,7 +7,7 @@ type CookieToSet = {
   options?: Parameters<NextResponse["cookies"]["set"]>[2];
 };
 
-const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/auth/callback"];
+const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/auth/callback", "/api/cron/monitor", "/api/cron/license-check"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });

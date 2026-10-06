@@ -3,12 +3,16 @@ import {getSupabaseAdmin,requireWritableOrganization} from "@/lib/supabaseAdmin"
 import {syncGoogleWorkspaceTenant} from "@/lib/googleSync";
 import {processProviderIncidents} from "@/lib/incidents";
 import {markMonitoringHealthy,recordMonitoringFailure} from "@/lib/monitoringHealth";
+import {acquireTenantSyncLock,releaseTenantSyncLock} from "@/lib/syncLock";
 export const dynamic="force-dynamic";
 export async function POST(_req:NextRequest,{params}:{params:Promise<{id:string}>}){
  try{
   const {id}=await params,org=await requireWritableOrganization(),sb=getSupabaseAdmin();
   const {data,error}=await sb.from("google_workspace_tenants").select("*").eq("id",id).eq("organization_id",org.id).single();
   if(error||!data)return NextResponse.json({error:"Google Workspace tenant not found"},{status:404});
+  const lockToken=await acquireTenantSyncLock("google",data.id,org.id);
+  if(!lockToken)return NextResponse.json({error:"Sync already in progress.",syncInProgress:true},{status:409});
+  try {
   const previousLastSync=data.last_sync_at||undefined;
   const result=await syncGoogleWorkspaceTenant(data);
   const incidents=await processProviderIncidents({
@@ -19,6 +23,7 @@ export async function POST(_req:NextRequest,{params}:{params:Promise<{id:string}
   await markMonitoringHealthy("google",data.id);
   return NextResponse.json({...result,incidentsCreated:incidents.created,alertsSent:0,
    note:"Manual Google sync analyzes incidents but does not send email alerts."});
+  } finally { await releaseTenantSyncLock("google",data.id,lockToken); }
   }catch(e:any){
   try{
    const {id}=await params,org=await requireWritableOrganization(),sb=getSupabaseAdmin();

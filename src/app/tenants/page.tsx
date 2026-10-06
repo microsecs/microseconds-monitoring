@@ -16,6 +16,7 @@ type GoogleTenant = {
   last_sync_error_at?: string | null;
   created_at: string;
   sort_order?: number | null;
+  sync_in_progress?: boolean;
 };
 
 type Tenant = {
@@ -30,6 +31,7 @@ type Tenant = {
   last_sync_error?: string | null;
   last_sync_error_at?: string | null;
   sort_order?: number | null;
+  sync_in_progress?: boolean;
 };
 
 const ENTRA_SIGNINS =
@@ -128,6 +130,13 @@ export default function TenantsPage() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setInitialLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") load().catch(() => {});
+    }, 30000);
+    return () => window.clearInterval(timer);
   }, []);
 
   async function syncGoogleTenant(id: string) {
@@ -650,7 +659,7 @@ export default function TenantsPage() {
                     </td>
 
                     <td style={{ minWidth: 185 }}>
-                      {latest ? (
+                      {t.sync_in_progress ? <div><strong>Syncing…</strong></div> : latest ? (
                         <>
                           <div><strong>{latestLabel}:</strong> {latest.toLocaleString()}</div>
                           {secondary ? (
@@ -667,8 +676,8 @@ export default function TenantsPage() {
                     <td className="tenantActionsCell">
                       <div className="tenantActions">
                         {t.automatic_monitoring_available === true ? (
-                          <button className="button primary compactAction tenantPrimaryAction" disabled={syncingAll || syncingId === t.id} onClick={() => syncTenant(t)}>
-                            Sync
+                          <button className="button primary compactAction tenantPrimaryAction" disabled={syncingAll || syncingId === t.id || t.sync_in_progress === true} onClick={() => syncTenant(t)}>
+                            {t.sync_in_progress ? "Syncing…" : "Sync"}
                           </button>
                         ) : (
                           <a className="button primary compactAction tenantPrimaryAction" href={`/import?tenant=${encodeURIComponent(t.id)}&browse=1`}>Import</a>
@@ -704,7 +713,7 @@ export default function TenantsPage() {
                     <span className="pill normal">{automaticMonitoringEnabled ? "Automatic Monitoring" : "Automatic Available"}</span>
                   </td>
                   <td>
-                    {g.last_sync_at ? (
+                    {g.sync_in_progress ? <div><strong>Syncing…</strong></div> : g.last_sync_at ? (
                       <div><strong>Sync:</strong> {new Date(g.last_sync_at).toLocaleString()}</div>
                     ) : (
                       <span className="muted">Never synced</span>
@@ -715,8 +724,8 @@ export default function TenantsPage() {
                       {g.connection_status === "reconnect_required" || g.connection_status === "problem" ? (
                         <a className="button primary compactAction tenantReconnectAction" href="/api/google/connect">Reconnect</a>
                       ) : (
-                        <button className="button primary compactAction tenantPrimaryAction" disabled={googleSyncingId === g.id} onClick={() => syncGoogleTenant(g.id)}>
-                          Sync
+                        <button className="button primary compactAction tenantPrimaryAction" disabled={googleSyncingId === g.id || g.sync_in_progress === true} onClick={() => syncGoogleTenant(g.id)}>
+                          {g.sync_in_progress ? "Syncing…" : "Sync"}
                         </button>
                       )}
                       <a className="button compactAction" href={`/signins?googleTenant=${encodeURIComponent(g.id)}&platform=google`}>Sign-ins</a>

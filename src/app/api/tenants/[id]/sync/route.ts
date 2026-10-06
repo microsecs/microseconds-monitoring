@@ -3,6 +3,7 @@ import { requireWritableOrganization, getSupabaseAdmin } from "@/lib/supabaseAdm
 import { syncMicrosoftTenant } from "@/lib/graphSync";
 import { processTenantIncidents } from "@/lib/incidents";
 import { markMonitoringHealthy, recordMonitoringFailure } from "@/lib/monitoringHealth";
+import { acquireTenantSyncLock, releaseTenantSyncLock } from "@/lib/syncLock";
 
 function isNonPremiumError(message: string) {
   const s = message.toLowerCase();
@@ -40,6 +41,9 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    const lockToken = await acquireTenantSyncLock("microsoft", tenant.id, org.id);
+    if (!lockToken) return NextResponse.json({ error: "Sync already in progress.", syncInProgress: true }, { status: 409 });
 
     try {
       const result = await syncMicrosoftTenant({
@@ -92,6 +96,8 @@ export async function POST(
       }
 
       throw e;
+    } finally {
+      await releaseTenantSyncLock("microsoft", tenant.id, lockToken);
     }
   } catch (e: any) {
     return NextResponse.json(

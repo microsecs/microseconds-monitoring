@@ -15,7 +15,7 @@ export function subscriptionState(org: OrganizationSubscription, now = new Date(
   const daysRemaining = effectiveStatus === "trialing" && validTrialEnd
     ? Math.max(0, Math.ceil((validTrialEnd.getTime() - now.getTime()) / 86400000))
     : 0;
-  const writable = effectiveStatus === "active" || effectiveStatus === "trialing" || effectiveStatus === "past_due";
+  const writable = effectiveStatus === "development" || effectiveStatus === "active" || effectiveStatus === "trialing" || effectiveStatus === "past_due";
   return { status: effectiveStatus, daysRemaining, trialEnd: validTrialEnd, writable };
 }
 
