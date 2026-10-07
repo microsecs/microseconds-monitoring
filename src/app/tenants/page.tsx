@@ -645,6 +645,9 @@ export default function TenantsPage() {
                     <td style={{ minWidth: 210 }}>
                       <div className="tenantName">{t.tenant_name || "Unnamed tenant"}</div>
                       {healthBadge(t.connection_status, t.last_sync_error) ? <div className="tenantHealth">{healthBadge(t.connection_status, t.last_sync_error)}</div> : <div className="tenantHealthy">Connection healthy</div>}
+                      {t.connection_status === "reconnect_required" ? (
+                        <div><a className="tenantReconnectLink" href="/api/microsoft/connect">Reconnect Microsoft 365</a></div>
+                      ) : null}
                     </td>
 
                     <td style={{ minWidth: 130 }}>
@@ -665,7 +668,7 @@ export default function TenantsPage() {
                     </td>
 
                     <td style={{ minWidth: 185 }}>
-                      {t.sync_in_progress ? <div><strong>Syncing…</strong></div> : latest ? (
+                      {latest ? (
                         <>
                           <div><strong>{latestLabel}:</strong> {latest.toLocaleString()}</div>
                         </>
@@ -678,7 +681,7 @@ export default function TenantsPage() {
                       <div className="tenantActions">
                         {t.automatic_monitoring_available === true ? (
                           <button className="button primary compactAction tenantPrimaryAction" disabled={syncingAll || syncingId === t.id || t.sync_in_progress === true} onClick={() => syncTenant(t)}>
-                            {t.sync_in_progress ? "Syncing…" : "Sync"}
+                            Sync
                           </button>
                         ) : (
                           <a className="button primary compactAction tenantPrimaryAction" href={`/import?tenant=${encodeURIComponent(t.id)}&browse=1`}>Import</a>
@@ -706,6 +709,9 @@ export default function TenantsPage() {
                   <td style={{ minWidth: 210 }}>
                     <div className="tenantName">{g.display_name}</div>
                     {healthBadge(g.connection_status, g.last_sync_error) ? <div className="tenantHealth">{healthBadge(g.connection_status, g.last_sync_error)}</div> : <div className="tenantHealthy">Connection healthy</div>}
+                    {g.connection_status === "reconnect_required" ? (
+                      <div><a className="tenantReconnectLink" href="/api/google/connect">Reconnect Google Workspace</a></div>
+                    ) : null}
                   </td>
                   <td style={{ minWidth: 130 }}>
                     <span className="pill normal">Google Workspace</span>
@@ -714,7 +720,7 @@ export default function TenantsPage() {
                     <span className="pill normal">{automaticMonitoringEnabled ? "Automatic Monitoring" : "Automatic Available"}</span>
                   </td>
                   <td>
-                    {g.sync_in_progress ? <div><strong>Syncing…</strong></div> : g.last_sync_at ? (
+                    {g.last_sync_at ? (
                       <div><strong>Sync:</strong> {new Date(g.last_sync_at).toLocaleString()}</div>
                     ) : (
                       <span className="muted">Never synced</span>
@@ -722,13 +728,9 @@ export default function TenantsPage() {
                   </td>
                   <td className="tenantActionsCell">
                     <div className="tenantActions">
-                      {g.connection_status === "reconnect_required" || g.connection_status === "problem" ? (
-                        <a className="button primary compactAction tenantReconnectAction" href="/api/google/connect">Reconnect</a>
-                      ) : (
-                        <button className="button primary compactAction tenantPrimaryAction" disabled={googleSyncingId === g.id || g.sync_in_progress === true} onClick={() => syncGoogleTenant(g.id)}>
-                          {g.sync_in_progress ? "Syncing…" : "Sync"}
-                        </button>
-                      )}
+                      <button className="button primary compactAction tenantPrimaryAction" disabled={googleSyncingId === g.id || g.sync_in_progress === true} onClick={() => syncGoogleTenant(g.id)}>
+                        Sync
+                      </button>
                       <a className="button compactAction" href={`/signins?googleTenant=${encodeURIComponent(g.id)}&platform=google`}>Sign-ins</a>
                       <button className="button compactAction" disabled={googleRenamingId===g.id} onClick={() => {
                         const next = window.prompt("Rename tenant", g.display_name || "");

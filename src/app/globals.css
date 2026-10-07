@@ -238,3 +238,6 @@ body{min-height:100vh}
 /* Tenant connection-health badges */
 .pill.connectionProblem{background:#3b1117;color:#fecaca;border:1px solid #7f1d1d;font-weight:700}
 .pill.syncDelayed{background:#3b2f0b;color:#fde68a;border:1px solid #854d0e;font-weight:700}
+
+/* Recovery link shown only when OAuth/authorization truly requires reconnection. */
+.tenantReconnectLink{display:inline-block;margin-top:5px;font-size:12px;font-weight:700;text-decoration:underline;text-underline-offset:2px}
