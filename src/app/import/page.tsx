@@ -33,7 +33,13 @@ function gv(row:RawRow, aliases:string[]){const m=new Map(Object.entries(row).ma
 function riskFromText(v:string){v=v.toLowerCase();if(v.includes("high"))return"high";if(v.includes("medium"))return"medium";if(v.includes("low"))return"low";return"none";}
 function looksFailed(status:string,errorCode:string,failureReason:string){if(errorCode&&errorCode!=="0")return true;const t=`${status} ${failureReason}`.toLowerCase();return /(fail|denied|blocked|error|interrupt)/.test(t)&&!t.includes("success");}
 function buildRecords(rows:RawRow[]):ImportedSignIn[]{return rows.map((row,index)=>{
-  const user=gv(row,["User principal name","UserPrincipalName","UPN","User","Username"]), displayName=gv(row,["User display name","UserDisplayName","Display name"]), ip=gv(row,["IP address","IPAddress","IP"]);
+  // Prefer explicit UPN/email columns before the generic "User" column. Some Microsoft
+  // CSV exports contain both a friendly User name and a Username/UPN email address.
+  const explicitEmail=gv(row,["User principal name","UserPrincipalName","UPN","Username","User name","Email","Email address"]);
+  const genericUser=gv(row,["User"]);
+  const user=explicitEmail||genericUser;
+  const displayName=gv(row,["User display name","UserDisplayName","Display name","User name/display name"])||((explicitEmail&&genericUser&&genericUser.toLowerCase()!==explicitEmail.toLowerCase())?genericUser:"");
+  const ip=gv(row,["IP address","IPAddress","IP"]);
   let city=gv(row,["City"]), state=gv(row,["State","Region"]), country=gv(row,["Country","Country/Region","CountryOrRegion"]); const locationText=gv(row,["Location"]);
   if(!city&&!state&&!country&&locationText){const p=locationText.split(",").map(x=>x.trim());city=p[0]||"";state=p[1]||"";country=p[2]||"";}
   const application=gv(row,["Application","Application name","AppDisplayName","Resource"]), status=gv(row,["Status","Sign-in status","Result"]), failureReason=gv(row,["Failure reason","FailureReason","Result description"]), errorCode=gv(row,["Error code","ErrorCode"]), microsoftRisk=gv(row,["Risk level during sign-in","RiskLevelDuringSignIn","Risk level","RiskLevelAggregated"]), time=gv(row,["Date","CreatedDateTime","Created date time","Time","Date (UTC)","Sign-in date"]), vpnRaw=gv(row,["VPN","Is VPN","VPN detected","Proxy","Is proxy"]);
