@@ -1,4 +1,9 @@
 const GRAPH_ROOT = "https://graph.microsoft.com/v1.0";
+const PROVIDER_REQUEST_TIMEOUT_MS = 30000;
+
+async function providerFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  return fetch(input, { ...init, signal: AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS) });
+}
 
 export async function getAppAccessToken(tenantId: string) {
   const clientId = process.env.MICROSOFT_CLIENT_ID;
@@ -15,7 +20,7 @@ export async function getAppAccessToken(tenantId: string) {
     grant_type: "client_credentials",
   });
 
-  const res = await fetch(
+  const res = await providerFetch(
     `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
     {
       method: "POST",
@@ -39,7 +44,7 @@ export async function getAppAccessToken(tenantId: string) {
 }
 
 async function graphGet(accessToken: string, url: string) {
-  const res = await fetch(url, {
+  const res = await providerFetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
   });

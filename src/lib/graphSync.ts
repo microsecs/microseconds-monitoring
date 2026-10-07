@@ -145,7 +145,7 @@ async function fetchJson(url: string) {
 
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      const r = await fetch(url, { cache: "no-store" });
+      const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(12000) });
       const text = await r.text();
       let data: any = {};
       try {

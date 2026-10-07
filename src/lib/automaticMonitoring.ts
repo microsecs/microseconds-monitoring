@@ -11,6 +11,11 @@ import { getOrganizationNotificationSettings } from "@/lib/notificationSettings"
 export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
   const sendAlerts=options.sendAlerts===true;
   const startedAt = new Date();
+  // Keep a safety margin below Vercel's 300s function ceiling so we can finish
+  // the current organization, send its alert batch, and return cleanly.
+  const MONITORING_BUDGET_MS = 255_000;
+  const budgetRemaining = () => MONITORING_BUDGET_MS - (Date.now() - startedAt.getTime());
+  let stoppedForBudget = false;
   const db = getSupabaseAdmin();
   const { data: settings, error: settingsError } = await db.from("organization_notification_settings")
     .select("organization_id,automatic_monitoring_enabled").eq("automatic_monitoring_enabled", true);
@@ -42,6 +47,11 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
   };
 
   for (const organizationId of organizationIds) {
+    if (budgetRemaining() < 45_000) {
+      stoppedForBudget = true;
+      console.warn(`[monitor] BUDGET — stopping before organization ${organizationId}; ${Math.max(0, budgetRemaining())}ms remain. Unprocessed tenants stay eligible for the next hourly run.`);
+      break;
+    }
     const organizationAlertCandidates:AlertCandidate[]=[];
     const [m, g] = await Promise.all([
       db.from("microsoft_tenants").select("id,tenant_id,tenant_name,last_sync_at").eq("organization_id", organizationId).eq("automatic_monitoring_available", true),
@@ -50,7 +60,17 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
     if (m.error) throw m.error;
     if (g.error) throw g.error;
 
-    for (const tenant of m.data || []) {
+    // Oldest/never-synced tenants first prevents a repeatedly slow tenant from
+    // starving tenants that have gone the longest without monitoring.
+    const microsoftTenants = [...(m.data || [])].sort((a:any,b:any) =>
+      new Date(a.last_sync_at || 0).getTime() - new Date(b.last_sync_at || 0).getTime()
+    );
+    const googleTenants = [...(g.data || [])].sort((a:any,b:any) =>
+      new Date(a.last_sync_at || 0).getTime() - new Date(b.last_sync_at || 0).getTime()
+    );
+
+    for (const tenant of microsoftTenants) {
+      if (budgetRemaining() < 45_000) { stoppedForBudget = true; console.warn(`[monitor] Microsoft 365 - ${tenant.tenant_name || tenant.tenant_id}: DEFERRED — cron safety budget reached; will retry next hourly run`); break; }
       const lockToken = await acquireTenantSyncLock("microsoft", tenant.id, organizationId);
       if (!lockToken) {
         const result = { organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: true, skipped: true, reason: "Sync already in progress" };
@@ -71,7 +91,8 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
       } finally { await releaseTenantSyncLock("microsoft", tenant.id, lockToken); }
     }
 
-    for (const tenant of g.data || []) {
+    for (const tenant of googleTenants) {
+      if (budgetRemaining() < 45_000) { stoppedForBudget = true; console.warn(`[monitor] Google Workspace - ${tenant.display_name || tenant.primary_domain || "Google Workspace"}: DEFERRED — cron safety budget reached; will retry next hourly run`); break; }
       const lockToken = await acquireTenantSyncLock("google", tenant.id, organizationId);
       if (!lockToken) {
         const result = { organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: true, skipped: true, reason: "Sync already in progress" };
@@ -111,14 +132,15 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
   const synced = tenantResults.filter((r: any) => r.ok && !r.skipped).length;
   const skipped = tenantResults.filter((r: any) => r.skipped).length;
   const failed = tenantResults.filter((r: any) => !r.ok).length;
-  console.log(`[monitor] SUMMARY — ${tenantResults.length} tenant(s) checked: ${synced} synced, ${skipped} skipped, ${failed} failed; ${organizationIds.length} organization(s) processed`);
+  console.log(`[monitor] SUMMARY — ${tenantResults.length} tenant(s) checked: ${synced} synced, ${skipped} skipped, ${failed} failed; budgetStop=${stoppedForBudget}`);
 
   return {
     ok: true,
     startedAt: startedAt.toISOString(),
     finishedAt: finishedAt.toISOString(),
     durationMs: finishedAt.getTime() - startedAt.getTime(),
-    organizationsProcessed: organizationIds.length,
+    organizationsProcessed: new Set(tenantResults.map((r:any)=>r.organizationId)).size,
+    stoppedForBudget,
     organizationsSkippedForSubscription: candidateOrganizationIds.length - organizationIds.length,
     tenantsProcessed: tenantResults.length,
     tenantsSynced: synced,
