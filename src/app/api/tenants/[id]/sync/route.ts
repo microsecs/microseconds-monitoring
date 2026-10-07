@@ -42,6 +42,25 @@ export async function POST(
       );
     }
 
+    // A tenant that previously used CSV already has a trustworthy monitoring
+    // checkpoint. Use the most recent CSV import as the first Graph checkpoint
+    // instead of asking Graph for an unbounded/latest-history query. This makes
+    // the CSV -> automatic transition fast even for very large tenants.
+    let firstGraphCheckpoint: string | undefined = tenant.last_sync_at || undefined;
+    if (!firstGraphCheckpoint) {
+      const { data: latestImport, error: importError } = await supabase
+        .from("imports")
+        .select("imported_at")
+        .eq("organization_id", org.id)
+        .eq("microsoft_tenant_id", tenant.id)
+        .eq("source", "csv")
+        .order("imported_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (importError) throw importError;
+      firstGraphCheckpoint = latestImport?.imported_at || undefined;
+    }
+
     const lockToken = await acquireTenantSyncLock("microsoft", tenant.id, org.id);
     if (!lockToken) return NextResponse.json({ error: "Sync already in progress.", syncInProgress: true }, { status: 409 });
 
@@ -51,6 +70,7 @@ export async function POST(
         microsoftTenantRecordId: tenant.id,
         microsoftTenantId: tenant.tenant_id,
         top: 250,
+        since: firstGraphCheckpoint,
       });
 
       // Analyze the newly synchronized window using the same incident engine
@@ -60,7 +80,7 @@ export async function POST(
         organizationId: org.id,
         microsoftTenantRecordId: tenant.id,
         tenantName: tenant.tenant_name || tenant.tenant_id,
-        since: tenant.last_sync_at || undefined,
+        since: firstGraphCheckpoint,
         sendAlerts: false,
       });
 

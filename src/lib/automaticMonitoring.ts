@@ -60,6 +60,26 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
     if (m.error) throw m.error;
     if (g.error) throw g.error;
 
+    // For Microsoft tenants transitioning from CSV monitoring, the most recent
+    // CSV import is a safe first incremental checkpoint. This avoids a large
+    // first Graph history request after Entra licensing becomes available.
+    const microsoftIds = (m.data || []).map((t:any) => t.id);
+    const csvCheckpointByTenant = new Map<string,string>();
+    if (microsoftIds.length) {
+      const { data: imports, error: importsError } = await db.from("imports")
+        .select("microsoft_tenant_id,imported_at")
+        .eq("organization_id", organizationId)
+        .eq("source", "csv")
+        .in("microsoft_tenant_id", microsoftIds)
+        .order("imported_at", { ascending: false });
+      if (importsError) throw importsError;
+      for (const row of imports || []) {
+        if (row.microsoft_tenant_id && !csvCheckpointByTenant.has(row.microsoft_tenant_id)) {
+          csvCheckpointByTenant.set(row.microsoft_tenant_id, row.imported_at);
+        }
+      }
+    }
+
     // Oldest/never-synced tenants first prevents a repeatedly slow tenant from
     // starving tenants that have gone the longest without monitoring.
     const microsoftTenants = [...(m.data || [])].sort((a:any,b:any) =>
@@ -77,10 +97,11 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
         results.push(result); logTenantResult(result); continue;
       }
       try {
-        const sync = await syncMicrosoftTenant({ organizationId, microsoftTenantRecordId: tenant.id, microsoftTenantId: tenant.tenant_id, since: tenant.last_sync_at || undefined });
+        const syncSince = tenant.last_sync_at || csvCheckpointByTenant.get(tenant.id) || undefined;
+        const sync = await syncMicrosoftTenant({ organizationId, microsoftTenantRecordId: tenant.id, microsoftTenantId: tenant.tenant_id, since: syncSince });
         const incidents = await processProviderIncidents({
           organizationId, provider: "microsoft", tenantRecordId: tenant.id,
-          tenantName: tenant.tenant_name || tenant.tenant_id, since: tenant.last_sync_at || undefined, sendAlerts: false,
+          tenantName: tenant.tenant_name || tenant.tenant_id, since: syncSince, sendAlerts: false,
         });
         organizationAlertCandidates.push(...(incidents.alertCandidates||[]));
         const result = { organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: true, ...sync, incidentsCreated: incidents.created, alertsSent: incidents.alerted };

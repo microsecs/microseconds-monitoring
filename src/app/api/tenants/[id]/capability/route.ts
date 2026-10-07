@@ -11,6 +11,6 @@ export async function POST(_req:NextRequest,context:{params:Promise<{id:string}>
     if(!t)return NextResponse.json({error:"Tenant not found."},{status:404});
     if(String(t.tenant_id).startsWith("manual:"))return NextResponse.json({available:false,manual:true,message:"This CSV-only tenant has not been connected to Microsoft yet."});
     const r=await checkTenantAutomaticMonitoring({organizationId:org.id,microsoftTenantRecordId:t.id,microsoftTenantId:t.tenant_id});
-    return NextResponse.json({...r,message:r.available?(r.changed?"Entra licensing now supports automatic monitoring. Sync Now has been enabled.":"Automatic monitoring is available for this tenant."):r.nonPremium?"Microsoft still reports that automatic sign-in monitoring is not available for this tenant.":"Microsoft access could not be verified right now. The tenant's existing monitoring status was not downgraded."});
+    return NextResponse.json({...r,message:r.available?(r.changed?"Entra licensing and Microsoft Graph access are confirmed. Automatic monitoring is now enabled.":"Automatic monitoring is available for this tenant."):r.nonPremium?"Microsoft still reports that automatic sign-in monitoring is not available for this tenant.":r.timedOut?"Microsoft did not answer the capability check in time. Nothing was changed; try the check again later.":"Microsoft access could not be verified right now. The tenant's existing monitoring status was not downgraded."});
   }catch(e:any){return NextResponse.json({error:e?.message||"Could not check tenant capability."},{status:500});}
 }

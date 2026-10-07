@@ -44,9 +44,13 @@ function monitoringLabel(t: Tenant, globalMonitoring: boolean) {
 }
 
 
-function healthBadge(status?: string | null) {
+function healthBadge(status?: string | null, error?: string | null) {
   if (status === "reconnect_required") return <span className="pill danger">Reconnection Required</span>;
-  if (status === "problem") return <span className="pill warn">Connection Problem</span>;
+  if (status === "problem") {
+    const low = String(error || "").toLowerCase();
+    if (low.includes("timeout") || low.includes("aborted")) return <span className="pill warn">Sync Delayed</span>;
+    return <span className="pill warn">Connection Problem</span>;
+  }
   return null;
 }
 
@@ -638,7 +642,7 @@ export default function TenantsPage() {
                     <td className="reorderCell"><button type="button" className="dragHandle" draggable={!savingOrder} onDragStart={() => setDraggingKey(item.key)} onDragEnd={() => setDraggingKey("")} aria-label={`Reorder ${t.tenant_name || "tenant"}`} title="Drag to reorder">⋮⋮</button></td>
                     <td style={{ minWidth: 210 }}>
                       <div className="tenantName">{t.tenant_name || "Unnamed tenant"}</div>
-                      {healthBadge(t.connection_status) ? <div className="tenantHealth">{healthBadge(t.connection_status)}</div> : <div className="tenantHealthy">Connection healthy</div>}
+                      {healthBadge(t.connection_status, t.last_sync_error) ? <div className="tenantHealth">{healthBadge(t.connection_status, t.last_sync_error)}</div> : <div className="tenantHealthy">Connection healthy</div>}
                     </td>
 
                     <td style={{ minWidth: 130 }}>
@@ -704,7 +708,7 @@ export default function TenantsPage() {
                   <td className="reorderCell"><button type="button" className="dragHandle" draggable={!savingOrder} onDragStart={() => setDraggingKey(item.key)} onDragEnd={() => setDraggingKey("")} aria-label={`Reorder ${g.display_name || "Google tenant"}`} title="Drag to reorder">⋮⋮</button></td>
                   <td style={{ minWidth: 210 }}>
                     <div className="tenantName">{g.display_name}</div>
-                    {healthBadge(g.connection_status) ? <div className="tenantHealth">{healthBadge(g.connection_status)}</div> : <div className="tenantHealthy">Connection healthy</div>}
+                    {healthBadge(g.connection_status, g.last_sync_error) ? <div className="tenantHealth">{healthBadge(g.connection_status, g.last_sync_error)}</div> : <div className="tenantHealthy">Connection healthy</div>}
                   </td>
                   <td style={{ minWidth: 130 }}>
                     <span className="pill normal">Google Workspace</span>
