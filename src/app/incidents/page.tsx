@@ -104,6 +104,15 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
       <div><div className="subtitle">Application</div><div>{s.app_name||platform}</div></div>
      </div>
      {reasons.length?<div style={{marginTop:18}}><div className="subtitle">Why it was flagged</div><div style={{display:"grid",gap:4,marginTop:7}}>{reasons.map((r:string,i:number)=><div key={i} style={{color:"#fde68a",fontSize:"inherit",fontWeight:400}}>• {r}</div>)}</div></div>:null}
+     {row.ai_reviewed?<div style={{marginTop:18,padding:"14px 16px",border:"1px solid var(--line)",borderRadius:10,background:"rgba(15,23,42,.45)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+       <div className="subtitle" style={{marginRight:2}}>AI Review</div>
+       <span className={`pill ${String(row.ai_classification||"").toLowerCase()==="critical"?"critical":String(row.ai_classification||"").toLowerCase()==="suspicious"?"warning":"normal"}`}>{String(row.ai_classification||"Reviewed").toUpperCase()}</span>
+       {row.ai_confidence!=null?<span className="pill">{Number(row.ai_confidence)}% CONFIDENCE</span>:null}
+      </div>
+      {row.ai_summary?<div style={{marginTop:9,lineHeight:1.55}}>{row.ai_summary}</div>:null}
+      <div className="subtitle" style={{marginTop:8}}>AI provides a second-stage assessment. The rules-based detection remains the underlying incident trigger.</div>
+     </div>:null}
      <IncidentActions incidentId={row.id} currentStatus={row.status}/>
     </div>})}
   </div>}
