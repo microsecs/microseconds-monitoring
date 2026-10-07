@@ -11,18 +11,20 @@ function pill(v?:string|null){const s=String(v||"inactive").toLowerCase();return
 export default async function CustomerDetail({params}:{params:Promise<{id:string}>}){
  await requireProductAdmin(); const {id}=await params; const db=getSupabaseAdmin();
  const since=new Date(Date.now()-30*86400000).toISOString();
- const [orgR,memR,msR,gR,monR,sR,iR]=await Promise.all([
+ const [orgR,memR,msR,gR,monR,sR,iR,aiR]=await Promise.all([
   db.from("organizations").select("*").eq("id",id).maybeSingle(),
   db.from("organization_members").select("organization_id,user_id,role").eq("organization_id",id),
   db.from("microsoft_tenants").select("id,tenant_name,tenant_id,connected_at,last_sync_at,connection_status,automatic_monitoring_available").eq("organization_id",id),
   db.from("google_workspace_tenants").select("id,display_name,primary_domain,admin_email,created_at,last_sync_at,connection_status").eq("organization_id",id),
   db.from("organization_notification_settings").select("automatic_monitoring_enabled").eq("organization_id",id).maybeSingle(),
   db.from("signins").select("id",{count:"exact",head:true}).eq("organization_id",id).gte("event_time",since),
-  db.from("security_incidents").select("id",{count:"exact",head:true}).eq("organization_id",id).gte("created_at",since)
+  db.from("security_incidents").select("id",{count:"exact",head:true}).eq("organization_id",id).gte("created_at",since),
+  db.from("ai_risk_usage").select("input_tokens,output_tokens,estimated_cost_usd").eq("organization_id",id).gte("created_at",since)
  ]);
  if(orgR.error||!orgR.data)notFound(); const org:any=orgR.data; const sub=subscriptionState(org); const members:any[]=memR.data||[];
  const emailById=new Map<string,string>(); if(members.length){let page=1;while(page<=10){const {data}=await db.auth.admin.listUsers({page,perPage:1000});for(const u of data?.users||[])if(members.some(m=>m.user_id===u.id))emailById.set(u.id,u.email||"");if(!data?.users||data.users.length<1000)break;page++;}}
- const ms:any[]=msR.data||[], gs:any[]=gR.data||[];
+ const ms:any[]=msR.data||[], gs:any[]=gR.data||[], ai:any[]=aiR.data||[];
+ const aiIn=ai.reduce((n,x)=>n+Number(x.input_tokens||0),0),aiOut=ai.reduce((n,x)=>n+Number(x.output_tokens||0),0),aiCost=ai.reduce((n,x)=>n+Number(x.estimated_cost_usd||0),0);
  return <>
   <div className="adminBack"><Link href="/admin">← Product Admin</Link></div>
   <div className="topbar"><div><div className="title">{org.name||org.slug||"Customer"}</div><div className="subtitle">Customer organization details and usage</div></div></div>
@@ -37,6 +39,12 @@ export default async function CustomerDetail({params}:{params:Promise<{id:string
    <div className="card"><div className="label">Connected Tenants</div><div className="metric">{ms.length+gs.length}</div></div>
    <div className="card"><div className="label">Sign-ins · 30 Days</div><div className="metric">{(sR.count||0).toLocaleString()}</div></div>
    <div className="card"><div className="label">Incidents · 30 Days</div><div className="metric">{(iR.count||0).toLocaleString()}</div></div>
+  </div>
+  <div className="grid4 adminMetrics adminMetricsSecond">
+   <div className="card"><div className="label">AI Reviews · 30 Days</div><div className="metric">{ai.length.toLocaleString()}</div></div>
+   <div className="card"><div className="label">AI Input Tokens</div><div className="metric">{aiIn.toLocaleString()}</div></div>
+   <div className="card"><div className="label">AI Output Tokens</div><div className="metric">{aiOut.toLocaleString()}</div></div>
+   <div className="card"><div className="label">Est. AI Cost</div><div className="metric">${aiCost.toFixed(4)}</div></div>
   </div>
   <div className="adminDetailGrid">
    <div className="section card"><h2>Users</h2><table className="table"><thead><tr><th>Email</th><th>Role</th></tr></thead><tbody>{members.map(m=><tr key={m.user_id}><td>{emailById.get(m.user_id)||"—"}</td><td><span className="pill normal">{m.role}</span></td></tr>)}</tbody></table></div>

@@ -149,11 +149,16 @@ export async function processProviderIncidents(x:{
   const user=s.user_display_name||s.user_principal_name||fallback;
   const title=`Suspicious successful sign-in for ${user}`;
   const summary=`Successful ${x.provider==="google"?"Google Workspace":"Microsoft 365"} sign-in from ${s.country||ii?.country||"an unknown country"} using ${s.ip_address||"an unknown IP"}. ${allReasons.join("; ")}`;
-  const ai=await createIncidentAnalysis({cloudProvider:x.provider==="google"?"Google Workspace":"Microsoft 365",user,time:s.event_time,ip:s.ip_address,country:s.country||ii?.country||null,city:s.city||ii?.city||null,provider:ii?.provider||null,asn:ii?.asn||null,app:s.app_name,status:s.status,riskScore:score,reasons:allReasons,baseline:b});
+  const ai=await createIncidentAnalysis({organizationId:x.organizationId,cloudProvider:x.provider==="google"?"Google Workspace":"Microsoft 365",user,time:s.event_time,ip:s.ip_address,country:s.country||ii?.country||null,city:s.city||ii?.city||null,provider:ii?.provider||null,asn:ii?.asn||null,app:s.app_name,status:s.status,riskScore:score,reasons:allReasons,baseline:b});
 
+  // AI is a second-stage reviewer. It may raise risk/severity, but never suppress a deterministic incident.
+  const effectiveScore=ai.usedAi&&ai.recommendedRiskScore!=null?Math.max(score,ai.recommendedRiskScore):score;
   const incidentRow:any={
-   organization_id:x.organizationId,signin_id:s.id,severity:severity(score),risk_score:score,
-   title,summary,ai_summary:ai,reasons:allReasons,baseline:b
+   organization_id:x.organizationId,signin_id:s.id,severity:severity(effectiveScore),risk_score:effectiveScore,
+   title,summary,ai_summary:ai.summary,reasons:allReasons,baseline:b,
+   ai_reviewed:ai.usedAi,ai_classification:ai.usedAi?ai.classification:null,ai_confidence:ai.confidence,
+   ai_recommended_risk_score:ai.recommendedRiskScore,ai_model:ai.model,
+   ai_input_tokens:ai.inputTokens,ai_output_tokens:ai.outputTokens,ai_estimated_cost_usd:ai.estimatedCostUsd
   };
   if(x.provider==="google"){
    incidentRow.microsoft_tenant_id=null;

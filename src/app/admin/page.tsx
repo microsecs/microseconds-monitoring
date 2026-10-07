@@ -23,7 +23,7 @@ export default async function ProductAdminPage() {
   const db = getSupabaseAdmin();
   const since = new Date(Date.now() - 30 * 86400000).toISOString();
 
-  const [orgRes, memberRes, msRes, googleRes, monitoringRes, signinsRes, incidentsRes] = await Promise.all([
+  const [orgRes, memberRes, msRes, googleRes, monitoringRes, signinsRes, incidentsRes, aiUsageRes] = await Promise.all([
     db.from("organizations").select("*", { count: "exact" }).order("created_at", { ascending: false }),
     db.from("organization_members").select("organization_id,user_id,role"),
     db.from("microsoft_tenants").select("id,organization_id,tenant_name,tenant_id,last_sync_at"),
@@ -31,6 +31,7 @@ export default async function ProductAdminPage() {
     db.from("organization_notification_settings").select("organization_id,automatic_monitoring_enabled"),
     db.from("signins").select("organization_id,event_time", { count: "exact" }).gte("event_time", since),
     db.from("security_incidents").select("organization_id,created_at", { count: "exact" }).gte("created_at", since),
+    db.from("ai_risk_usage").select("organization_id,input_tokens,output_tokens,estimated_cost_usd,created_at").gte("created_at", since),
   ]);
 
   const organizations: any[] = orgRes.data || [];
@@ -40,6 +41,7 @@ export default async function ProductAdminPage() {
   const monitoring: any[] = monitoringRes.data || [];
   const signins: any[] = signinsRes.data || [];
   const incidents: any[] = incidentsRes.data || [];
+  const aiUsage: any[] = aiUsageRes.data || [];
 
   const userIds = [...new Set(members.map(x => x.user_id).filter(Boolean))];
   const emailByUser = new Map<string,string>();
@@ -60,16 +62,20 @@ export default async function ProductAdminPage() {
     const gs = google.filter(x => x.organization_id === org.id);
     const orgSignins = signins.filter(x => x.organization_id === org.id);
     const orgIncidents = incidents.filter(x => x.organization_id === org.id);
+    const orgAi = aiUsage.filter(x => x.organization_id === org.id);
     const mon = monitoring.find(x => x.organization_id === org.id);
     const syncDates = [...ms, ...gs].map(x => x.last_sync_at).filter(Boolean).sort().reverse();
     const sub=subscriptionState(org);
-    return { org, sub, ownerEmail: owner ? emailByUser.get(owner.user_id) || "—" : "—", users: orgMembers.length, tenants: ms.length + gs.length, monitoring: mon?.automatic_monitoring_enabled === true, signins: orgSignins.length, incidents: orgIncidents.length, lastSync: syncDates[0] || null };
+    return { org, sub, ownerEmail: owner ? emailByUser.get(owner.user_id) || "—" : "—", users: orgMembers.length, tenants: ms.length + gs.length, monitoring: mon?.automatic_monitoring_enabled === true, signins: orgSignins.length, incidents: orgIncidents.length, aiReviews:orgAi.length, aiCost:orgAi.reduce((n,x)=>n+Number(x.estimated_cost_usd||0),0), lastSync: syncDates[0] || null };
   });
 
   const connectedTenants = microsoft.length + google.length;
   const monitoringOrgs = new Set(monitoring.filter(x => x.automatic_monitoring_enabled === true).map(x => x.organization_id)).size;
   const activeStatuses = new Set(["active", "trialing"]);
   const activeCustomers = organizations.filter(x => activeStatuses.has(subscriptionState(x).status)).length;
+  const aiInputTokens=aiUsage.reduce((n,x)=>n+Number(x.input_tokens||0),0);
+  const aiOutputTokens=aiUsage.reduce((n,x)=>n+Number(x.output_tokens||0),0);
+  const aiCost=aiUsage.reduce((n,x)=>n+Number(x.estimated_cost_usd||0),0);
 
   return <>
     <div className="topbar"><div><div className="title">Product Admin</div><div className="subtitle">MicroSECONDS Monitoring customer and usage overview</div></div></div>
@@ -85,11 +91,17 @@ export default async function ProductAdminPage() {
       <div className="card"><div className="label">Incidents · 30 Days</div><div className="metric">{incidents.length.toLocaleString()}</div></div>
       <div className="card"><div className="label">Avg. Tenants / Customer</div><div className="metric">{organizations.length ? (connectedTenants / organizations.length).toFixed(1) : "0.0"}</div></div>
     </div>
+    <div className="grid4 adminMetrics adminMetricsSecond">
+      <div className="card"><div className="label">AI Reviews · 30 Days</div><div className="metric">{aiUsage.length.toLocaleString()}</div></div>
+      <div className="card"><div className="label">AI Input Tokens · 30 Days</div><div className="metric">{aiInputTokens.toLocaleString()}</div></div>
+      <div className="card"><div className="label">AI Output Tokens · 30 Days</div><div className="metric">{aiOutputTokens.toLocaleString()}</div></div>
+      <div className="card"><div className="label">Est. AI Cost · 30 Days</div><div className="metric">${aiCost.toFixed(4)}</div></div>
+    </div>
     <RunMonitoringNow />
     <div className="section card">
       <div className="adminTableHeader"><div><h2>Customers</h2><div className="muted">Organizations, account ownership, monitoring and recent usage</div></div></div>
-      {rows.length ? <div className="tableScroll"><table className="table adminCustomerTable"><thead><tr><th>Organization</th><th>Owner</th><th>Plan</th><th>Status</th><th>Trial Ends</th><th>Tenants</th><th>Users</th><th>Monitoring</th><th>30d Sign-ins</th><th>30d Incidents</th><th>Last Sync</th></tr></thead><tbody>
-        {rows.map(r => <tr key={r.org.id}><td><Link className="adminCustomerLink" href={`/admin/customers/${r.org.id}`}>{r.org.name || r.org.slug || "Organization"}</Link></td><td>{r.ownerEmail}</td><td>{r.org.plan || "—"}</td><td><span className={`pill ${statusClass(r.sub.status)}`}>{r.sub.status}</span></td><td>{r.org.trial_ends_at ? fmtDate(r.org.trial_ends_at) : "—"}</td><td>{r.tenants}</td><td>{r.users}</td><td><span className={`pill ${r.monitoring ? "normal" : "review"}`}>{r.monitoring ? "Enabled" : "Off"}</span></td><td>{r.signins.toLocaleString()}</td><td>{r.incidents.toLocaleString()}</td><td>{fmtDate(r.lastSync)}</td></tr>)}
+      {rows.length ? <div className="tableScroll"><table className="table adminCustomerTable"><thead><tr><th>Organization</th><th>Owner</th><th>Plan</th><th>Status</th><th>Trial Ends</th><th>Tenants</th><th>Users</th><th>Monitoring</th><th>30d Sign-ins</th><th>30d Incidents</th><th>AI Reviews</th><th>Est. AI Cost</th><th>Last Sync</th></tr></thead><tbody>
+        {rows.map(r => <tr key={r.org.id}><td><Link className="adminCustomerLink" href={`/admin/customers/${r.org.id}`}>{r.org.name || r.org.slug || "Organization"}</Link></td><td>{r.ownerEmail}</td><td>{r.org.plan || "—"}</td><td><span className={`pill ${statusClass(r.sub.status)}`}>{r.sub.status}</span></td><td>{r.org.trial_ends_at ? fmtDate(r.org.trial_ends_at) : "—"}</td><td>{r.tenants}</td><td>{r.users}</td><td><span className={`pill ${r.monitoring ? "normal" : "review"}`}>{r.monitoring ? "Enabled" : "Off"}</span></td><td>{r.signins.toLocaleString()}</td><td>{r.incidents.toLocaleString()}</td><td>{r.aiReviews.toLocaleString()}</td><td>${r.aiCost.toFixed(4)}</td><td>{fmtDate(r.lastSync)}</td></tr>)}
       </tbody></table></div> : <div className="empty">No customer organizations found.</div>}
     </div>
   </>;
