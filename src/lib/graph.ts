@@ -92,6 +92,23 @@ export async function getRecentSignIns(accessToken: string, top = 250) {
   return Array.isArray(data?.value) ? data.value : [];
 }
 
+export async function getSignInsSince(accessToken: string, since: string, maxEvents = 10000) {
+  const select = [
+    "id","createdDateTime","userDisplayName","userPrincipalName","appDisplayName",
+    "ipAddress","clientAppUsed","location","deviceDetail","status",
+    "conditionalAccessStatus","riskDetail","riskLevelAggregated","riskLevelDuringSignIn","riskState",
+  ].join(",");
+  const start = new Date(since).toISOString();
+  let url = `${GRAPH_ROOT}/auditLogs/signIns?$top=500&$filter=${encodeURIComponent(`createdDateTime ge ${start}`)}&$orderby=createdDateTime asc&$select=${encodeURIComponent(select)}`;
+  const all: any[] = [];
+  while (url && all.length < maxEvents) {
+    const data = await graphGet(accessToken, url);
+    all.push(...(Array.isArray(data?.value) ? data.value : []));
+    url = typeof data?.["@odata.nextLink"] === "string" ? data["@odata.nextLink"] : "";
+  }
+  return all.slice(0, maxEvents);
+}
+
 export async function getOrganizationProfile(accessToken: string) {
   const url =
     `${GRAPH_ROOT}/organization` +

@@ -15,16 +15,19 @@ function classify(eventNames:string[]){
  const failed=eventNames.find(n=>n.includes("failure")||n.includes("failed"));
  return failed?{status:"failure",failure:failed}:{status:eventNames[0]||"event",failure:null};
 }
-export async function syncGoogleWorkspaceTenant(tenant:any){
+export async function syncGoogleWorkspaceTenant(tenant:any, options:{automatic?:boolean}={}){
+ const automatic=options.automatic===true;
  const sb=getSupabaseAdmin();
  const token=await refreshGoogleAccessToken(tenant.refresh_token_encrypted);
  const start=tenant.last_sync_at
-  ? new Date(new Date(tenant.last_sync_at).getTime()-2*60*60*1000).toISOString()
+  ? new Date(new Date(tenant.last_sync_at).getTime()-10*60*1000).toISOString()
   : new Date(Date.now()-30*24*60*60*1000).toISOString();
- const [activities, directoryUsers]=await Promise.all([
-  googleLoginActivities(token,start),
-  googleDirectoryUsers(token)
- ]);
+ let activities=await googleLoginActivities(token,start);
+ // Bound a brand-new automatic tenant so first connection cannot monopolize cron.
+ if(automatic && !tenant.last_sync_at && activities.length>250) activities=activities.slice(-250);
+ // Full directory enumeration is useful during manual repair/sync, but is wasteful
+ // every hour on large tenants. Automatic runs safely fall back to email display.
+ const directoryUsers=automatic ? [] : await googleDirectoryUsers(token);
  const directoryNameMap=new Map(
   directoryUsers.map(u=>[u.primaryEmail.toLowerCase(),u.fullName])
  );
@@ -89,7 +92,7 @@ export async function syncGoogleWorkspaceTenant(tenant:any){
  const historicalIps = new Set<string>();
  let histFrom = 0;
  const histPageSize = 1000;
- while (true) {
+ while (!automatic) {
    const { data: histRows, error: histError } = await sb.from("signins")
      .select("ip_address,city,region,country")
      .eq("organization_id", tenant.organization_id)

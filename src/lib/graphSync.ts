@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import net from "node:net";
-import { getAppAccessToken, getRecentSignIns } from "@/lib/graph";
+import { getAppAccessToken, getRecentSignIns, getSignInsSince } from "@/lib/graph";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 type Intel = {
@@ -400,10 +400,15 @@ export async function syncMicrosoftTenant(params: {
   microsoftTenantRecordId: string;
   microsoftTenantId: string;
   top?: number;
+  since?: string;
 }) {
   const supabase = getSupabaseAdmin();
   const accessToken = await getAppAccessToken(params.microsoftTenantId);
-  const rawRows = await getRecentSignIns(accessToken, params.top || 250);
+  // Hourly monitoring is incremental. A 10-minute overlap protects against late
+  // provider records; the existing fingerprint constraint safely removes overlap duplicates.
+  const rawRows = params.since
+    ? await getSignInsSince(accessToken, new Date(new Date(params.since).getTime() - 10 * 60 * 1000).toISOString(), 10000)
+    : await getRecentSignIns(accessToken, params.top || 250);
 
   const byFingerprint = new Map<string, any>();
   for (const row of rawRows) {

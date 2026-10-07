@@ -77,7 +77,7 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
         results.push(result); logTenantResult(result); continue;
       }
       try {
-        const sync = await syncMicrosoftTenant({ organizationId, microsoftTenantRecordId: tenant.id, microsoftTenantId: tenant.tenant_id });
+        const sync = await syncMicrosoftTenant({ organizationId, microsoftTenantRecordId: tenant.id, microsoftTenantId: tenant.tenant_id, since: tenant.last_sync_at || undefined });
         const incidents = await processProviderIncidents({
           organizationId, provider: "microsoft", tenantRecordId: tenant.id,
           tenantName: tenant.tenant_name || tenant.tenant_id, since: tenant.last_sync_at || undefined, sendAlerts: false,
@@ -100,7 +100,7 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
       }
       try {
         const previousLastSync = tenant.last_sync_at || undefined;
-        const sync = await syncGoogleWorkspaceTenant(tenant);
+        const sync = await syncGoogleWorkspaceTenant(tenant, { automatic: true });
         const incidents = await processProviderIncidents({
           organizationId, provider: "google", tenantRecordId: tenant.id,
           tenantName: tenant.display_name || tenant.primary_domain || "Google Workspace", since: previousLastSync, sendAlerts: false,
