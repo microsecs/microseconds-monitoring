@@ -45,11 +45,11 @@ function monitoringLabel(t: Tenant, globalMonitoring: boolean) {
 
 
 function healthBadge(status?: string | null, error?: string | null) {
-  if (status === "reconnect_required") return <span className="pill danger">Reconnection Required</span>;
+  if (status === "reconnect_required") return <span className="pill connectionProblem">Reconnection Required</span>;
   if (status === "problem") {
     const low = String(error || "").toLowerCase();
-    if (low.includes("timeout") || low.includes("aborted")) return <span className="pill warn">Sync Delayed</span>;
-    return <span className="pill warn">Connection Problem</span>;
+    if (low.includes("timeout") || low.includes("aborted")) return <span className="pill syncDelayed">Sync Delayed</span>;
+    return <span className="pill connectionProblem">Connection Problem</span>;
   }
   return null;
 }
