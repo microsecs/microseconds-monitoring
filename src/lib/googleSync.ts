@@ -61,17 +61,20 @@ export async function syncGoogleWorkspaceTenant(tenant:any, options:{automatic?:
   });
   for(const user of lookedUp) if(user?.fullName) directoryNameMap.set(user.primaryEmail.toLowerCase(),user.fullName);
 
-  // Repair already-stored Google rows for these users too. This fixes recent records that
-  // were saved with the email address as their display name before this resolver ran.
-  for(const [email,name] of directoryNameMap) {
-   if(!activityEmails.includes(email) || !name) continue;
-   const {error: repairError}=await sb.from("signins")
-    .update({user_display_name:name})
-    .eq("organization_id",tenant.organization_id)
-    .eq("google_workspace_tenant_id",tenant.id)
-    .eq("user_principal_name",email);
-   if(repairError) console.warn("Google stored display-name repair failed",email,repairError);
-  }
+ }
+
+ // Repair already-stored Google rows whenever we know a real friendly name.
+ // This runs for BOTH automatic and manual Sync Now. Previously it only ran during
+ // automatic monitoring, so a manual sync could resolve the Directory name but leave
+ // an already-stored sign-in (and its incident) showing the email as the user name.
+ for(const [email,name] of directoryNameMap) {
+  if(!name || name.trim().toLowerCase()===email.trim().toLowerCase()) continue;
+  const {error: repairError}=await sb.from("signins")
+   .update({user_display_name:name})
+   .eq("organization_id",tenant.organization_id)
+   .eq("google_workspace_tenant_id",tenant.id)
+   .ilike("user_principal_name",email);
+  if(repairError) console.warn("Google stored display-name repair failed",email,repairError);
  }
  const rows:any[]=[];
  for(const a of activities){
