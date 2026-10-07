@@ -67,11 +67,15 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
         results.push({ organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: false, error: e?.message || "Automatic sync failed" });
       } finally { await releaseTenantSyncLock("google", tenant.id, lockToken); }
     }
-    if(sendAlerts && organizationAlertCandidates.length){
+    if(sendAlerts){
       const notificationSettings=await getOrganizationNotificationSettings(organizationId);
+      console.log(`[alerts] ${organizationId}: automatic run collected ${organizationAlertCandidates.length} candidate incident(s); enabled=${notificationSettings.enabled}; successfulAlerts=${notificationSettings.alert_successful_suspicious}; recipients=${notificationSettings.alert_emails.length}`);
       if(notificationSettings.enabled && notificationSettings.alert_successful_suspicious){
         const batch=await sendConsolidatedIncidentAlert({organizationId,recipients:notificationSettings.alert_emails,candidates:organizationAlertCandidates});
-        results.push({organizationId,platform:"Email",tenant:"Consolidated security alert",ok:true,emailsSent:batch.sent,incidentsAlerted:batch.incidentsAlerted});
+        results.push({organizationId,platform:"Email",tenant:"Consolidated security alert",ok:true,emailsSent:batch.sent,incidentsAlerted:batch.incidentsAlerted,emailReason:(batch as any).reason||null});
+      } else {
+        console.log(`[alerts] ${organizationId}: email alerts disabled by organization settings`);
+        results.push({organizationId,platform:"Email",tenant:"Consolidated security alert",ok:true,skipped:true,reason:"Email alerts disabled"});
       }
     }
     retention.push({ organizationId, ...await enforceSignInRetention(organizationId) });

@@ -78,7 +78,16 @@ export async function processProviderIncidents(x:{
  let created=0,alerted=0;
  const alertCandidates:any[]=[];
  for(const s of rows||[]){
-  const {data:old}=await db.from("security_incidents").select("id").eq("signin_id",s.id).maybeSingle();if(old)continue;
+  const {data:old}=await db.from("security_incidents").select("*").eq("signin_id",s.id).maybeSingle();
+  // Existing, not-yet-alerted incidents remain eligible for the consolidated email.
+  // This lets a failed/missed email submission retry on a later automatic run instead of
+  // permanently losing the alert simply because the incident row already exists.
+  if(old){
+    if(settings.enabled&&settings.alert_successful_suspicious&&!old.alerted_at){
+      alertCandidates.push({organizationId:x.organizationId,incident:old,signin:s,tenantName:x.tenantName,provider:x.provider});
+    }
+    continue;
+  }
   const {data:f}=await db.from("security_findings").select("risk_score,reasons").eq("signin_id",s.id).maybeSingle();
   const b=await baseline(s,x.provider,x.tenantRecordId,criteria),ii=await intel(s.ip_address),extra:string[]=[];
 
@@ -156,7 +165,7 @@ export async function processProviderIncidents(x:{
   const {data:inc,error:ie}=await db.from("security_incidents").insert(incidentRow).select("*").single();
   if(ie){if(String(ie.message).toLowerCase().includes("duplicate"))continue;throw ie;}created++;
 
-  if(settings.enabled&&score>=settings.min_risk_score&&settings.alert_successful_suspicious){
+  if(settings.enabled&&settings.alert_successful_suspicious){
    alertCandidates.push({organizationId:x.organizationId,incident:inc,signin:s,tenantName:x.tenantName,provider:x.provider});
   }
  }
