@@ -113,7 +113,7 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
       {row.ai_summary?<div style={{marginTop:9,lineHeight:1.55}}>{row.ai_summary}</div>:null}
       <div className="subtitle" style={{marginTop:8}}>AI provides a second-stage assessment. The rules-based detection remains the underlying incident trigger.</div>
      </div>:null}
-     <IncidentActions incidentId={row.id} currentStatus={row.status}/>
+     <IncidentActions incidentId={row.id} currentStatus={row.status} resolution={row.resolution}/>
     </div>})}
   </div>}
   <div className="card" style={{marginTop:14,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>

@@ -11,7 +11,7 @@ export async function POST(req:NextRequest){
     let updated=0;
     for(let i=0;i<ids.length;i+=40){
       const {data,error}=await db.from("security_incidents").update({
-        status:"dismissed",updated_at:new Date().toISOString()
+        status:"dismissed",resolution:"dismissed",resolved_at:new Date().toISOString(),updated_at:new Date().toISOString()
       }).eq("organization_id",org.id).in("id",ids.slice(i,i+40)).select("id");
       if(error)throw error;
       updated+=data?.length||0;

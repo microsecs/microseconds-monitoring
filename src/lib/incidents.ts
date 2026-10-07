@@ -2,6 +2,7 @@ import { getSupabaseAdmin, getOrCreateDevOrganization } from "@/lib/supabaseAdmi
 import { createIncidentAnalysis } from "@/lib/aiIncident";
 import { getEffectiveNotificationSettings, getOrganizationNotificationSettings } from "@/lib/notificationSettings";
 import { getIncidentCriteria, IncidentCriteria } from "@/lib/incidentCriteria";
+import { getRelevantIncidentFeedback } from "@/lib/incidentFeedback";
 
 const uniq=(a:any[])=>Array.from(new Set(a));
 const severity=(n:number)=>n>=70?"critical":n>=40?"suspicious":"review";
@@ -142,6 +143,10 @@ export async function processProviderIncidents(x:{
   if(extra.some(r=>r.includes("First-seen IP")))score+=criteria.first_seen_ip_points;
   if(extra.some(r=>r.startsWith("New network provider")))score+=criteria.new_provider_points;
   if(extra.some(r=>r.startsWith("First-seen ASN")))score+=criteria.first_seen_asn_points;
+  // Administrator-confirmed feedback is a bounded signal, not a blanket whitelist.
+  const feedback=await getRelevantIncidentFeedback({organizationId:x.organizationId,provider:x.provider,tenantRecordId:x.tenantRecordId,userPrincipalName:String(s.user_principal_name||""),ip:s.ip_address,city:s.city||ii?.city||null,country:s.country||ii?.country||null,networkProvider:ii?.provider||null,asn:ii?.asn||null});
+  if(feedback.safeAdjustment){score=Math.max(0,score-feedback.safeAdjustment);reasons.push("Similar activity was previously marked safe by an administrator");}
+  if(feedback.suspiciousAdjustment){score+=feedback.suspiciousAdjustment;reasons.push("Similar activity was previously confirmed suspicious by an administrator");}
   score=Math.min(100,score);if(score<criteria.incident_threshold)continue;
 
   const allReasons=uniq([...reasons,...extra]);
@@ -149,7 +154,7 @@ export async function processProviderIncidents(x:{
   const user=s.user_display_name||s.user_principal_name||fallback;
   const title=`Suspicious successful sign-in for ${user}`;
   const summary=`Successful ${x.provider==="google"?"Google Workspace":"Microsoft 365"} sign-in from ${s.country||ii?.country||"an unknown country"} using ${s.ip_address||"an unknown IP"}. ${allReasons.join("; ")}`;
-  const ai=await createIncidentAnalysis({organizationId:x.organizationId,cloudProvider:x.provider==="google"?"Google Workspace":"Microsoft 365",user,time:s.event_time,ip:s.ip_address,country:s.country||ii?.country||null,city:s.city||ii?.city||null,provider:ii?.provider||null,asn:ii?.asn||null,app:s.app_name,status:s.status,riskScore:score,reasons:allReasons,baseline:b});
+  const ai=await createIncidentAnalysis({organizationId:x.organizationId,cloudProvider:x.provider==="google"?"Google Workspace":"Microsoft 365",user,time:s.event_time,ip:s.ip_address,country:s.country||ii?.country||null,city:s.city||ii?.city||null,provider:ii?.provider||null,asn:ii?.asn||null,app:s.app_name,status:s.status,riskScore:score,reasons:allReasons,baseline:b,priorFeedback:feedback.summary});
 
   // AI is a second-stage reviewer. It may raise risk/severity, but never suppress a deterministic incident.
   const effectiveScore=ai.usedAi&&ai.recommendedRiskScore!=null?Math.max(score,ai.recommendedRiskScore):score;

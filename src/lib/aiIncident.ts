@@ -5,7 +5,7 @@ type IncidentFacts = {
   cloudProvider: "Microsoft 365" | "Google Workspace";
   user: string; time: string | null; ip: string | null; country: string | null; city: string | null;
   provider: string | null; asn: string | null; app: string | null; status: string | null;
-  riskScore: number; reasons: string[]; baseline: any;
+  riskScore: number; reasons: string[]; baseline: any; priorFeedback?: string[];
 };
 
 export type AiIncidentReview = {
@@ -69,7 +69,8 @@ export async function createIncidentAnalysis(f:IncidentFacts):Promise<AiIncident
    `The platform is ${f.cloudProvider}. Use only the supplied facts; never invent facts.`,
    "The deterministic rules engine has already identified this successful sign-in as an incident candidate.",
    "Return ONLY JSON with: classification (low|suspicious|critical), confidence (integer 0-100), recommended_risk_score (integer 0-100), summary (2-4 concise sentences).",
-   "Evaluate whether the combination of location, network, baseline, application, and supplied risk indicators makes the activity concerning.",
+   "Evaluate whether the combination of location, network, baseline, application, supplied risk indicators, and administrator feedback makes the activity concerning.",
+   "Administrator feedback is authoritative historical context: previously safe similar activity should reduce concern, while previously confirmed suspicious similar activity should increase concern. Do not treat it as a blanket IP or location whitelist.",
    "Do not claim compromise without evidence. Give one practical verification step in the summary.",
    "A low classification is allowed, but the application will not suppress a deterministic incident solely because of the AI opinion.",
    "",JSON.stringify(f)
