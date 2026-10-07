@@ -33,11 +33,11 @@ function privacyLabel(intel:any){
  if(intel.privacy_available===true)return "None detected";
  return "Unknown";
 }
-function href(params:any,page:number){const p=new URLSearchParams();if(params.failed==="1")p.set("failed","1");if(params.dismissed==="1")p.set("dismissed","1");if(params.q)p.set("q",params.q);p.set("page",String(page));return `/incidents?${p.toString()}`;}
-export default async function IncidentsPage({searchParams}:{searchParams:Promise<{failed?:string;dismissed?:string;page?:string;q?:string}>}){
- const params=await searchParams,includeFailed=params.failed==="1",includeDismissed=params.dismissed==="1",search=(params.q||"").trim();
+function href(params:any,page:number){const p=new URLSearchParams();if(params.dismissed==="1")p.set("dismissed","1");if(params.q)p.set("q",params.q);p.set("page",String(page));return `/incidents?${p.toString()}`;}
+export default async function IncidentsPage({searchParams}:{searchParams:Promise<{dismissed?:string;page?:string;q?:string}>}){
+ const params=await searchParams,includeDismissed=params.dismissed==="1",search=(params.q||"").trim();
  const page=Math.max(1,Number(params.page||"1")||1),pageSize=100;
- const result=await getIncidentQueuePage({page,pageSize,includeDismissed,includeFailed,search:search||undefined});
+ const result=await getIncidentQueuePage({page,pageSize,includeDismissed,includeFailed:false,search:search||undefined});
  const rows=result.rows,total=result.total,totalPages=Math.max(1,Math.ceil(total/pageSize));
  const first=rows.length?(page-1)*pageSize+1:0,last=rows.length?first+rows.length-1:0;
  const active=rows.filter((x:any)=>x.status!=="dismissed");
@@ -49,16 +49,14 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
    <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
     <div style={{display:"flex",gap:6,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>
      <form method="get" style={{display:"flex",gap:6,alignItems:"center"}}>
-      {includeFailed?<input type="hidden" name="failed" value="1"/>:null}
       {includeDismissed?<input type="hidden" name="dismissed" value="1"/>:null}
       <input className="input" type="search" name="q" defaultValue={search} placeholder="Search incidents…" aria-label="Search incidents" style={{width:220,height:38,padding:"0 12px",fontSize:14,borderRadius:8}}/>
       <button className="button" type="submit">Search</button>
-      {search?<a className="button deleteAction" title="Clear search" aria-label="Clear search" href={`/incidents?failed=${includeFailed?"1":"0"}&dismissed=${includeDismissed?"1":"0"}&page=1`}>×</a>:null}
+      {search?<a className="button deleteAction" title="Clear search" aria-label="Clear search" href={`/incidents?dismissed=${includeDismissed?"1":"0"}&page=1`}>×</a>:null}
      </form>
     </div>
     <div style={{display:"flex",gap:8,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>
-     <a className="button" style={{fontSize:14}} href={`/incidents?failed=${includeFailed?"0":"1"}&dismissed=${includeDismissed?"1":"0"}${search?`&q=${encodeURIComponent(search)}`:""}&page=1`}>{includeFailed?"Hide Failed Logins":"Include Failed Logins"}</a>
-     <a className="button" style={{fontSize:14}} href={`/incidents?failed=${includeFailed?"1":"0"}&dismissed=${includeDismissed?"0":"1"}${search?`&q=${encodeURIComponent(search)}`:""}&page=1`}>{includeDismissed?"Hide Dismissed":"Show Dismissed"}</a>
+     <a className="button" style={{fontSize:14}} href={`/incidents?dismissed=${includeDismissed?"0":"1"}${search?`&q=${encodeURIComponent(search)}`:""}&page=1`}>{includeDismissed?"Hide Dismissed":"Show Dismissed"}</a>
     </div>
     <div style={{display:"flex",alignItems:"center"}}>
      {!includeDismissed?<DismissAllButton ids={rows.filter((x:any)=>x.status!=="dismissed").map((x:any)=>x.id)}/>:null}
