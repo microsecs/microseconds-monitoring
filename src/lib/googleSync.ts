@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { refreshGoogleAccessToken, googleLoginActivities, googleDirectoryUsers } from "@/lib/googleWorkspace";
+import { refreshGoogleAccessToken, googleLoginActivities, googleDirectoryUsers, googleDirectoryUser } from "@/lib/googleWorkspace";
 import { getIpIntel, mapLimit } from "@/lib/graphSync";
 
 function parameters(activity:any){
@@ -29,8 +29,50 @@ export async function syncGoogleWorkspaceTenant(tenant:any, options:{automatic?:
  // every hour on large tenants. Automatic runs safely fall back to email display.
  const directoryUsers=automatic ? [] : await googleDirectoryUsers(token);
  const directoryNameMap=new Map(
-  directoryUsers.map(u=>[u.primaryEmail.toLowerCase(),u.fullName])
+  directoryUsers.filter(u=>u.fullName).map(u=>[u.primaryEmail.toLowerCase(),u.fullName])
  );
+
+ // Automatic monitoring should not enumerate the whole Google directory every hour.
+ // Reuse names we already learned for the same tenant/email, then do targeted Directory
+ // lookups only for users present in this batch whose friendly name is still unknown.
+ const activityEmails = Array.from(new Set(activities.map((a:any) =>
+  String(a.actor?.email || parameters(a).get("affected_email_address") || "").trim().toLowerCase()
+ ).filter(Boolean))) as string[];
+ if (automatic && activityEmails.length) {
+  for (let i=0;i<activityEmails.length;i+=100) {
+   const emails=activityEmails.slice(i,i+100);
+   const {data: knownRows,error: knownError}=await sb.from("signins")
+    .select("user_principal_name,user_display_name")
+    .eq("organization_id",tenant.organization_id)
+    .eq("google_workspace_tenant_id",tenant.id)
+    .in("user_principal_name",emails)
+    .not("user_display_name","is",null);
+   if(knownError) throw knownError;
+   for(const r of knownRows||[]) {
+    const email=String(r.user_principal_name||"").trim().toLowerCase();
+    const name=String(r.user_display_name||"").trim();
+    if(email && name && name.toLowerCase()!==email) directoryNameMap.set(email,name);
+   }
+  }
+  const unresolved=activityEmails.filter(email=>!directoryNameMap.get(email));
+  const lookedUp=await mapLimit(unresolved,4,async(email)=>{
+   try { return await googleDirectoryUser(token,email); }
+   catch(e) { console.warn("Google Directory targeted user lookup failed",email,e); return null; }
+  });
+  for(const user of lookedUp) if(user?.fullName) directoryNameMap.set(user.primaryEmail.toLowerCase(),user.fullName);
+
+  // Repair already-stored Google rows for these users too. This fixes recent records that
+  // were saved with the email address as their display name before this resolver ran.
+  for(const [email,name] of directoryNameMap) {
+   if(!activityEmails.includes(email) || !name) continue;
+   const {error: repairError}=await sb.from("signins")
+    .update({user_display_name:name})
+    .eq("organization_id",tenant.organization_id)
+    .eq("google_workspace_tenant_id",tenant.id)
+    .eq("user_principal_name",email);
+   if(repairError) console.warn("Google stored display-name repair failed",email,repairError);
+  }
+ }
  const rows:any[]=[];
  for(const a of activities){
   const p=parameters(a),eventNames=names(a),classification=classify(eventNames);
@@ -49,7 +91,7 @@ export async function syncGoogleWorkspaceTenant(tenant:any, options:{automatic?:
    user_principal_name:a.actor?.email||p.get("affected_email_address")||null,
    user_display_name:(()=>{
      const email=String(a.actor?.email||p.get("affected_email_address")||"").toLowerCase();
-     return directoryNameMap.get(email)||a.actor?.email||p.get("affected_email_address")||null;
+     return directoryNameMap.get(email)||null;
    })(),
    event_time:a.id?.time||new Date().toISOString(),
    ip_address:a.ipAddress||null,

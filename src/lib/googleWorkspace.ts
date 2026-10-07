@@ -49,6 +49,27 @@ export type GoogleDirectoryUser = {
   fullName: string | null;
 };
 
+
+export async function googleDirectoryUser(accessToken: string, email: string): Promise<GoogleDirectoryUser | null> {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) return null;
+  const u = new URL(`https://admin.googleapis.com/admin/directory/v1/users/${encodeURIComponent(normalized)}`);
+  u.searchParams.set("projection", "basic");
+  const r = await providerFetch(u, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+  if (r.status === 404) return null;
+  const j = await r.json();
+  if (!r.ok) throw new Error(j?.error?.message || "Google Directory user lookup failed");
+  const primaryEmail = String(j?.primaryEmail || normalized).trim().toLowerCase();
+  const fullName =
+    String(j?.name?.fullName || "").trim() ||
+    [j?.name?.givenName, j?.name?.familyName].filter(Boolean).join(" ").trim() ||
+    null;
+  return { primaryEmail, fullName };
+}
+
 export async function googleDirectoryUsers(accessToken: string): Promise<GoogleDirectoryUser[]> {
   let pageToken: string | undefined;
   const all: GoogleDirectoryUser[] = [];
