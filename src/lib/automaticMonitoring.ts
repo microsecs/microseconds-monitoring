@@ -26,6 +26,21 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
   const results: any[] = [];
   const retention: any[] = [];
 
+  const logTenantResult = (r: any) => {
+    if (r.skipped) {
+      console.log(`[monitor] ${r.platform} - ${r.tenant}: SKIPPED — ${r.reason || "No reason supplied"}`);
+    } else if (!r.ok) {
+      console.error(`[monitor] ${r.platform} - ${r.tenant}: FAILED — ${r.error || "Unknown error"}`);
+    } else {
+      const details = [
+        typeof r.saved === "number" ? `${r.saved} saved` : null,
+        typeof r.newEvents === "number" ? `${r.newEvents} new` : null,
+        typeof r.incidentsCreated === "number" ? `${r.incidentsCreated} incident(s)` : null,
+      ].filter(Boolean).join(", ");
+      console.log(`[monitor] ${r.platform} - ${r.tenant}: SYNCED${details ? ` — ${details}` : ""}`);
+    }
+  };
+
   for (const organizationId of organizationIds) {
     const organizationAlertCandidates:AlertCandidate[]=[];
     const [m, g] = await Promise.all([
@@ -37,7 +52,10 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
 
     for (const tenant of m.data || []) {
       const lockToken = await acquireTenantSyncLock("microsoft", tenant.id, organizationId);
-      if (!lockToken) { results.push({ organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: true, skipped: true, reason: "Sync already in progress" }); continue; }
+      if (!lockToken) {
+        const result = { organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: true, skipped: true, reason: "Sync already in progress" };
+        results.push(result); logTenantResult(result); continue;
+      }
       try {
         const sync = await syncMicrosoftTenant({ organizationId, microsoftTenantRecordId: tenant.id, microsoftTenantId: tenant.tenant_id });
         const incidents = await processProviderIncidents({
@@ -45,15 +63,20 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
           tenantName: tenant.tenant_name || tenant.tenant_id, since: tenant.last_sync_at || undefined, sendAlerts: false,
         });
         organizationAlertCandidates.push(...(incidents.alertCandidates||[]));
-        results.push({ organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: true, ...sync, incidentsCreated: incidents.created, alertsSent: incidents.alerted });
+        const result = { organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: true, ...sync, incidentsCreated: incidents.created, alertsSent: incidents.alerted };
+        results.push(result); logTenantResult(result);
       } catch (e: any) {
-        results.push({ organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: false, error: e?.message || "Automatic sync failed" });
+        const result = { organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: false, error: e?.message || "Automatic sync failed" };
+        results.push(result); logTenantResult(result);
       } finally { await releaseTenantSyncLock("microsoft", tenant.id, lockToken); }
     }
 
     for (const tenant of g.data || []) {
       const lockToken = await acquireTenantSyncLock("google", tenant.id, organizationId);
-      if (!lockToken) { results.push({ organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: true, skipped: true, reason: "Sync already in progress" }); continue; }
+      if (!lockToken) {
+        const result = { organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: true, skipped: true, reason: "Sync already in progress" };
+        results.push(result); logTenantResult(result); continue;
+      }
       try {
         const previousLastSync = tenant.last_sync_at || undefined;
         const sync = await syncGoogleWorkspaceTenant(tenant);
@@ -62,9 +85,11 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
           tenantName: tenant.display_name || tenant.primary_domain || "Google Workspace", since: previousLastSync, sendAlerts: false,
         });
         organizationAlertCandidates.push(...(incidents.alertCandidates||[]));
-        results.push({ organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: true, ...sync, incidentsCreated: incidents.created, alertsSent: incidents.alerted });
+        const result = { organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: true, ...sync, incidentsCreated: incidents.created, alertsSent: incidents.alerted };
+        results.push(result); logTenantResult(result);
       } catch (e: any) {
-        results.push({ organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: false, error: e?.message || "Automatic sync failed" });
+        const result = { organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: false, error: e?.message || "Automatic sync failed" };
+        results.push(result); logTenantResult(result);
       } finally { await releaseTenantSyncLock("google", tenant.id, lockToken); }
     }
     if(sendAlerts){
@@ -82,6 +107,12 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
   }
 
   const finishedAt = new Date();
+  const tenantResults = results.filter((r: any) => r.platform !== "Email");
+  const synced = tenantResults.filter((r: any) => r.ok && !r.skipped).length;
+  const skipped = tenantResults.filter((r: any) => r.skipped).length;
+  const failed = tenantResults.filter((r: any) => !r.ok).length;
+  console.log(`[monitor] SUMMARY — ${tenantResults.length} tenant(s) checked: ${synced} synced, ${skipped} skipped, ${failed} failed; ${organizationIds.length} organization(s) processed`);
+
   return {
     ok: true,
     startedAt: startedAt.toISOString(),
@@ -89,9 +120,11 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
     durationMs: finishedAt.getTime() - startedAt.getTime(),
     organizationsProcessed: organizationIds.length,
     organizationsSkippedForSubscription: candidateOrganizationIds.length - organizationIds.length,
-    tenantsProcessed: results.length,
-    successes: results.filter((r: any) => r.ok).length,
-    failures: results.filter((r: any) => !r.ok).length,
+    tenantsProcessed: tenantResults.length,
+    tenantsSynced: synced,
+    tenantsSkipped: skipped,
+    successes: synced,
+    failures: failed,
     results,
     retention,
   };
