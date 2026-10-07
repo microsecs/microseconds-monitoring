@@ -1,6 +1,5 @@
 import { getSupabaseAdmin, getOrCreateDevOrganization } from "@/lib/supabaseAdmin";
 import { createIncidentAnalysis } from "@/lib/aiIncident";
-import { sendIncidentAlerts } from "@/lib/emailAlerts";
 import { getEffectiveNotificationSettings, getOrganizationNotificationSettings } from "@/lib/notificationSettings";
 import { getIncidentCriteria, IncidentCriteria } from "@/lib/incidentCriteria";
 
@@ -77,6 +76,7 @@ export async function processProviderIncidents(x:{
  const {data:rows,error}=await q;if(error)throw error;
 
  let created=0,alerted=0;
+ const alertCandidates:any[]=[];
  for(const s of rows||[]){
   const {data:old}=await db.from("security_incidents").select("id").eq("signin_id",s.id).maybeSingle();if(old)continue;
   const {data:f}=await db.from("security_findings").select("risk_score,reasons").eq("signin_id",s.id).maybeSingle();
@@ -156,13 +156,11 @@ export async function processProviderIncidents(x:{
   const {data:inc,error:ie}=await db.from("security_incidents").insert(incidentRow).select("*").single();
   if(ie){if(String(ie.message).toLowerCase().includes("duplicate"))continue;throw ie;}created++;
 
-  if(x.sendAlerts!==false&&settings.enabled&&score>=settings.min_risk_score&&
-    settings.alert_successful_suspicious){
-   const r=await sendIncidentAlerts({organizationId:x.organizationId,incident:inc,signin:s,tenantName:x.tenantName,recipients:settings.alert_emails});
-   if(r.sent){alerted+=r.sent;await db.from("security_incidents").update({alerted_at:new Date().toISOString()}).eq("id",inc.id);}
+  if(settings.enabled&&score>=settings.min_risk_score&&settings.alert_successful_suspicious){
+   alertCandidates.push({organizationId:x.organizationId,incident:inc,signin:s,tenantName:x.tenantName,provider:x.provider});
   }
  }
- return {created,alerted,notificationSource:settings.source};
+ return {created,alerted,notificationSource:settings.source,alertCandidates};
 }
 
 // Backward-compatible wrapper for Microsoft/CSV routes.

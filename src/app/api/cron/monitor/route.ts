@@ -8,7 +8,7 @@ async function runMonitor(req: NextRequest) {
     const secret = process.env.CRON_SECRET;
     if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    return NextResponse.json(await runAutomaticMonitoring());
+    return NextResponse.json(await runAutomaticMonitoring({sendAlerts:true}));
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Automatic monitoring failed" }, { status: 500 });
   }

@@ -5,8 +5,11 @@ import { syncGoogleWorkspaceTenant } from "@/lib/googleSync";
 import { processProviderIncidents } from "@/lib/incidents";
 import { subscriptionState } from "@/lib/subscription";
 import { acquireTenantSyncLock, releaseTenantSyncLock } from "@/lib/syncLock";
+import { sendConsolidatedIncidentAlert, AlertCandidate } from "@/lib/emailAlerts";
+import { getOrganizationNotificationSettings } from "@/lib/notificationSettings";
 
-export async function runAutomaticMonitoring() {
+export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
+  const sendAlerts=options.sendAlerts===true;
   const startedAt = new Date();
   const db = getSupabaseAdmin();
   const { data: settings, error: settingsError } = await db.from("organization_notification_settings")
@@ -24,6 +27,7 @@ export async function runAutomaticMonitoring() {
   const retention: any[] = [];
 
   for (const organizationId of organizationIds) {
+    const organizationAlertCandidates:AlertCandidate[]=[];
     const [m, g] = await Promise.all([
       db.from("microsoft_tenants").select("id,tenant_id,tenant_name,last_sync_at").eq("organization_id", organizationId).eq("automatic_monitoring_available", true),
       db.from("google_workspace_tenants").select("*").eq("organization_id", organizationId),
@@ -38,8 +42,9 @@ export async function runAutomaticMonitoring() {
         const sync = await syncMicrosoftTenant({ organizationId, microsoftTenantRecordId: tenant.id, microsoftTenantId: tenant.tenant_id });
         const incidents = await processProviderIncidents({
           organizationId, provider: "microsoft", tenantRecordId: tenant.id,
-          tenantName: tenant.tenant_name || tenant.tenant_id, since: tenant.last_sync_at || undefined, sendAlerts: true,
+          tenantName: tenant.tenant_name || tenant.tenant_id, since: tenant.last_sync_at || undefined, sendAlerts: false,
         });
+        organizationAlertCandidates.push(...(incidents.alertCandidates||[]));
         results.push({ organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: true, ...sync, incidentsCreated: incidents.created, alertsSent: incidents.alerted });
       } catch (e: any) {
         results.push({ organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: false, error: e?.message || "Automatic sync failed" });
@@ -54,12 +59,20 @@ export async function runAutomaticMonitoring() {
         const sync = await syncGoogleWorkspaceTenant(tenant);
         const incidents = await processProviderIncidents({
           organizationId, provider: "google", tenantRecordId: tenant.id,
-          tenantName: tenant.display_name || tenant.primary_domain || "Google Workspace", since: previousLastSync, sendAlerts: true,
+          tenantName: tenant.display_name || tenant.primary_domain || "Google Workspace", since: previousLastSync, sendAlerts: false,
         });
+        organizationAlertCandidates.push(...(incidents.alertCandidates||[]));
         results.push({ organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: true, ...sync, incidentsCreated: incidents.created, alertsSent: incidents.alerted });
       } catch (e: any) {
         results.push({ organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: false, error: e?.message || "Automatic sync failed" });
       } finally { await releaseTenantSyncLock("google", tenant.id, lockToken); }
+    }
+    if(sendAlerts && organizationAlertCandidates.length){
+      const notificationSettings=await getOrganizationNotificationSettings(organizationId);
+      if(notificationSettings.enabled && notificationSettings.alert_successful_suspicious){
+        const batch=await sendConsolidatedIncidentAlert({organizationId,recipients:notificationSettings.alert_emails,candidates:organizationAlertCandidates});
+        results.push({organizationId,platform:"Email",tenant:"Consolidated security alert",ok:true,emailsSent:batch.sent,incidentsAlerted:batch.incidentsAlerted});
+      }
     }
     retention.push({ organizationId, ...await enforceSignInRetention(organizationId) });
   }
