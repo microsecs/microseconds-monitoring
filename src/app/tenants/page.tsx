@@ -631,11 +631,13 @@ export default function TenantsPage() {
 
                 const syncTime = t.last_sync_at ? new Date(t.last_sync_at) : null;
                 const csvTime = t.last_csv_import_at ? new Date(t.last_csv_import_at) : null;
-                const latestIsSync = !!syncTime && (!csvTime || syncTime.getTime() >= csvTime.getTime());
-                const latest = latestIsSync ? syncTime : csvTime;
-                const secondary = latestIsSync ? csvTime : syncTime;
-                const latestLabel = latestIsSync ? "Sync" : "CSV import";
-                const secondaryLabel = latestIsSync ? "CSV import" : "Sync";
+                // Once a tenant has completed a successful Microsoft sync, automatic
+                // monitoring is the authoritative activity source. Keep the CSV import
+                // timestamp in the database for history, but do not continue showing it
+                // in the tenant list. Before the first successful sync, retain the CSV
+                // import timestamp so converted tenants still show their last activity.
+                const latest = syncTime || csvTime;
+                const latestLabel = syncTime ? "Sync" : "CSV import";
 
                 return (
                   <tr key={item.key} className={draggingKey === item.key ? "tenantRowDragging" : ""} onDragOver={(e) => e.preventDefault()} onDrop={() => dropTenant(item.key)}>
@@ -666,11 +668,6 @@ export default function TenantsPage() {
                       {t.sync_in_progress ? <div><strong>Syncing…</strong></div> : latest ? (
                         <>
                           <div><strong>{latestLabel}:</strong> {latest.toLocaleString()}</div>
-                          {secondary ? (
-                            <div className="subtitle" style={{ marginTop: 3, fontSize: 12 }}>
-                              {secondaryLabel}: {secondary.toLocaleString()}
-                            </div>
-                          ) : null}
                         </>
                       ) : (
                         <span className="muted">No activity yet</span>
