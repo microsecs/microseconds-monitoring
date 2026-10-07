@@ -11,6 +11,9 @@ function cleanRiskReasons(input:any[] = []) {
     let text = String(raw || "").trim();
     if (!text) continue;
     let key = text.toLowerCase().replace(/[.;]+$/g, "").trim();
+    // Older CSV imports stored this informational message as a risk reason.
+    // It must not make an otherwise normal sign-in look suspicious.
+    if (key === "no suspicious indicators found in available data" || key === "no risk indicators detected") continue;
     if (key === "hosting/datacenter network" || key === "hosting/datacenter network detected") {
       key = "hosting/datacenter network";
       text = "Hosting/datacenter network detected";
@@ -174,12 +177,16 @@ export default async function SigninsPage({
             </thead>
 
             <tbody>
-              {visibleRows.map((r: any) => (
+              {visibleRows.map((r: any) => {
+                const riskScore = r.risk_score == null || r.risk_score === "" ? null : Number(r.risk_score);
+                const riskReasons = cleanRiskReasons(Array.isArray(r.reasons) ? r.reasons : []);
+                const hasRisk = riskScore != null && Number.isFinite(riskScore) && riskScore > 0 && riskReasons.length > 0;
+                return (
                 <tr
                   key={r.id}
                   className={
-                    Array.isArray(r.reasons) && r.reasons.length
-                      ? Number(r.risk_score || 0) >= 70
+                    hasRisk
+                      ? riskScore >= 70
                         ? "signinRiskRow signinRiskCritical"
                         : "signinRiskRow signinRiskAttention"
                       : undefined
@@ -259,17 +266,18 @@ export default async function SigninsPage({
                   </td>
 
                   <td style={{ verticalAlign: "middle" }}>
-                    {Array.isArray(r.reasons) && r.reasons.length ? (
+                    {hasRisk ? (
                       <div>
-                        {typeof r.risk_score === "number" ? <strong>{r.risk_score}/100</strong> : null}
-                        <div className="subtitle" style={{ marginTop: typeof r.risk_score === "number" ? 2 : 0 }}>
-                          {cleanRiskReasons(r.reasons).join("; ")}
+                        <strong>{riskScore}/100</strong>
+                        <div className="subtitle" style={{ marginTop: 2 }}>
+                          {riskReasons.join("; ")}
                         </div>
                       </div>
                     ) : "No risk indicators detected"}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
 
               {!visibleRows.length ? (
                 <tr>

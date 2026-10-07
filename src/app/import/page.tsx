@@ -55,7 +55,7 @@ function analyze(records:ImportedSignIn[], intelMap:Map<string,IpIntel>):Analyze
     const actualCountry=(r.country||intel?.country||"").toLowerCase(), typical=normalCountry.get(r.user.toLowerCase()); if(typical&&actualCountry&&actualCountry!==typical)add(20,"Different country than user's most common uploaded location");
     if(r.ip && (ipUsers.get(r.ip)?.size||0)>=5) add(5,"IP address used by multiple users in this upload");
     score=Math.min(score,100); const level:AnalyzedSignIn["level"]=score>=60?"critical":score>=30?"suspicious":score>=15?"review":"normal";
-    return {...r,intel,score,level,reasons:reasons.length?reasons:["No suspicious indicators found in available data"]};
+    return {...r,intel,score,level,reasons};
   });
 }
 function fmtTime(v:string){if(!v)return"—";const d=new Date(v);return Number.isNaN(d.valueOf())?v:d.toLocaleString();}
