@@ -1,8 +1,21 @@
 const GRAPH_ROOT = "https://graph.microsoft.com/v1.0";
-const PROVIDER_REQUEST_TIMEOUT_MS = 30000;
+const PROVIDER_REQUEST_TIMEOUT_MS = 60000;
 
-async function providerFetch(input: RequestInfo | URL, init: RequestInit = {}) {
-  return fetch(input, { ...init, signal: AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS) });
+async function providerFetch(input: RequestInfo | URL, init: RequestInit = {}, operation = "Microsoft request") {
+  try {
+    return await fetch(input, { ...init, signal: AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS) });
+  } catch (error: any) {
+    const message = String(error?.message || "").toLowerCase();
+    const timedOut =
+      error?.name === "TimeoutError" ||
+      error?.name === "AbortError" ||
+      message.includes("timeout") ||
+      message.includes("aborted");
+    if (timedOut) {
+      throw new Error(`${operation} timed out after ${PROVIDER_REQUEST_TIMEOUT_MS / 1000} seconds.`);
+    }
+    throw error;
+  }
 }
 
 export async function getAppAccessToken(tenantId: string) {
@@ -27,7 +40,8 @@ export async function getAppAccessToken(tenantId: string) {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
       cache: "no-store",
-    }
+    },
+    "Microsoft access-token request"
   );
 
   const data = await res.json();
@@ -43,23 +57,37 @@ export async function getAppAccessToken(tenantId: string) {
   return data.access_token as string;
 }
 
-async function graphGet(accessToken: string, url: string) {
-  const res = await providerFetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    cache: "no-store",
-  });
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    const code = data?.error?.code ? `${data.error.code}: ` : "";
-    const message =
-      data?.error?.message || `Microsoft Graph request failed (${res.status}).`;
-    throw new Error(`${code}${message}`);
-  }
-
-  return data;
+function graphOperation(url: string) {
+  if (url.includes("/auditLogs/signIns")) return "Microsoft Graph sign-in request";
+  if (url.includes("/organization")) return "Microsoft Graph organization request";
+  return "Microsoft Graph request";
 }
+
+async function graphGet(accessToken: string, url: string) {
+  const operation = graphOperation(url);
+  const startedAt = Date.now();
+  try {
+    const res = await providerFetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+    }, operation);
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      const code = data?.error?.code ? `${data.error.code}: ` : "";
+      const message =
+        data?.error?.message || `Microsoft Graph request failed (${res.status}).`;
+      throw new Error(`${code}${message}`);
+    }
+
+    return data;
+  } catch (error: any) {
+    console.error(`[microsoft-graph] ${operation} failed after ${Date.now() - startedAt}ms: ${error?.message || error}`);
+    throw error;
+  }
+}
+
 
 export async function getRecentSignIns(accessToken: string, top = 250) {
   const safeTop = Math.max(1, Math.min(1000, Number(top) || 250));
