@@ -3,31 +3,63 @@ import {getSupabaseAdmin} from "@/lib/supabaseAdmin";
 type Provider="microsoft"|"google";
 export type FeedbackContext={summary:string[];safeAdjustment:number;suspiciousAdjustment:number};
 
-const norm=(v:any)=>String(v||"").trim().toLowerCase();
+const norm=(v:any)=>String(v??"").trim().toLowerCase();
+const DAY=24*60*60*1000;
 
+/**
+ * Conservative, tenant- and user-scoped feedback learning.
+ * Only verified Safe / Confirm Suspicious actions are stored as feedback.
+ * Dismissal is intentionally not evidence. A single safe event earns only a
+ * small adjustment; repeated independent confirmations increase confidence.
+ * Conflicting recent evidence prevents safe feedback from reducing risk.
+ */
 export async function getRelevantIncidentFeedback(x:{organizationId:string;provider:Provider;tenantRecordId:string;userPrincipalName:string;ip?:string|null;city?:string|null;country?:string|null;networkProvider?:string|null;asn?:string|null}):Promise<FeedbackContext>{
+ const user=norm(x.userPrincipalName);
+ if(!user||!x.organizationId||!x.tenantRecordId)return {summary:[],safeAdjustment:0,suspiciousAdjustment:0};
  const db=getSupabaseAdmin();
- let q=db.from("incident_feedback").select("feedback_type,ip_address,city,country,network_provider,asn,created_at")
-  .eq("organization_id",x.organizationId).ilike("user_principal_name",x.userPrincipalName).order("created_at",{ascending:false}).limit(25);
+ let q=db.from("incident_feedback").select("incident_id,feedback_type,ip_address,city,country,network_provider,asn,created_at")
+  .eq("organization_id",x.organizationId).ilike("user_principal_name",user)
+  .gte("created_at",new Date(Date.now()-90*DAY).toISOString())
+  .order("created_at",{ascending:false}).limit(100);
  q=x.provider==="google"?q.eq("google_workspace_tenant_id",x.tenantRecordId):q.eq("microsoft_tenant_id",x.tenantRecordId);
- const {data,error}=await q;if(error){console.warn("[feedback] lookup failed",error);return {summary:[],safeAdjustment:0,suspiciousAdjustment:0};}
- let safe=0,suspicious=0;const summary:string[]=[];
+ const {data,error}=await q;
+ if(error){console.warn("[feedback] lookup failed",error);return {summary:[],safeAdjustment:0,suspiciousAdjustment:0};}
+ const seen=new Set<string>();
+ let safeExact=0,safeSimilar=0,suspiciousExact=0,suspiciousSimilar=0;
  for(const f of data||[]){
+  const incidentId=String(f.incident_id||"");
+  if(incidentId&&seen.has(incidentId))continue;
+  if(incidentId)seen.add(incidentId);
   const exactIp=!!x.ip&&norm(f.ip_address)===norm(x.ip);
-  const sameProvider=!!x.networkProvider&&norm(f.network_provider)===norm(x.networkProvider);
-  const sameAsn=!!x.asn&&norm(f.asn)===norm(x.asn);
-  const sameCity=!!x.city&&norm(f.city)===norm(x.city);
-  const sameCountry=!!x.country&&norm(f.country)===norm(x.country);
-  const similar=exactIp||((sameProvider||sameAsn)&&(sameCity||sameCountry));
-  if(!similar)continue;
-  // Rows are newest first. The most recent matching administrator decision wins.
-  if(f.feedback_type==="safe")safe=exactIp?20:12;
-  if(f.feedback_type==="suspicious")suspicious=exactIp?20:12;
-  break;
+  const sameNetwork=(!!x.networkProvider&&norm(f.network_provider)===norm(x.networkProvider))||
+   (!!x.asn&&norm(f.asn)===norm(x.asn));
+  const sameLocation=(!!x.city&&!!x.country&&norm(f.city)===norm(x.city)&&norm(f.country)===norm(x.country));
+  // Require exact IP or BOTH matching network and city/country. Country alone is too broad.
+  if(!exactIp&&!(sameNetwork&&sameLocation))continue;
+  if(f.feedback_type==="safe"){
+   if(exactIp)safeExact++;else safeSimilar++;
+  }else if(f.feedback_type==="suspicious"){
+   if(exactIp)suspiciousExact++;else suspiciousSimilar++;
+  }
  }
- if(safe)summary.push(`Administrator previously marked similar activity safe (${safe}-point trust signal).`);
- if(suspicious)summary.push(`Administrator previously confirmed similar activity suspicious (${suspicious}-point risk signal).`);
- return {summary,safeAdjustment:safe,suspiciousAdjustment:suspicious};
+ const safeCount=safeExact+safeSimilar;
+ const suspiciousCount=suspiciousExact+suspiciousSimilar;
+ const summary:string[]=[];
+ let safeAdjustment=0,suspiciousAdjustment=0;
+ // Never treat verified-safe history as a blanket allowlist; contradictory
+ // suspicious feedback blocks a safe reduction and is surfaced to the AI.
+ if(safeCount&&suspiciousCount){
+  summary.push(`Conflicting administrator feedback: ${safeCount} safe and ${suspiciousCount} suspicious similar sign-ins; no trust reduction applied.`);
+ }
+ if(safeCount&&!suspiciousCount){
+  safeAdjustment=Math.min(12,(safeExact?4:2)+Math.min(4,safeExact)*2+Math.min(2,safeSimilar));
+  summary.push(`${safeCount} administrator-verified safe similar sign-in(s) within 90 days (${safeAdjustment}-point bounded trust signal).`);
+ }
+ if(suspiciousCount){
+  suspiciousAdjustment=Math.min(25,(suspiciousExact?12:7)+Math.min(4,suspiciousExact)*3+Math.min(3,suspiciousSimilar)*2);
+  summary.push(`${suspiciousCount} administrator-confirmed suspicious similar sign-in(s) within 90 days (${suspiciousAdjustment}-point risk signal).`);
+ }
+ return {summary,safeAdjustment,suspiciousAdjustment};
 }
 
 export async function recordIncidentFeedback(x:{organizationId:string;incident:any;signin:any;intel:any;feedbackType:"safe"|"suspicious"}){
