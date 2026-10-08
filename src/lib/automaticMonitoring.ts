@@ -23,33 +23,43 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
 
   const candidateOrganizationIds = [...new Set((settings || []).map((x: any) => x.organization_id).filter(Boolean))];
   const { data: orgRows, error: orgError } = candidateOrganizationIds.length
-    ? await db.from("organizations").select("id,plan,subscription_status,trial_started_at,trial_ends_at").in("id", candidateOrganizationIds)
+    ? await db.from("organizations").select("id,name,plan,subscription_status,trial_started_at,trial_ends_at").in("id", candidateOrganizationIds)
     : { data: [], error: null };
   if (orgError) throw orgError;
 
-  const organizationIds = (orgRows || []).filter((org: any) => subscriptionState(org).writable).map((org: any) => org.id);
+  const eligibleOrganizations = (orgRows || []).filter((org: any) => subscriptionState(org).writable);
+  const organizationIds = eligibleOrganizations.map((org: any) => org.id);
+  const organizationNameById = new Map((orgRows || []).map((org:any) => [org.id, org.name || org.id]));
+
+  for (const org of orgRows || []) {
+    const state = subscriptionState(org);
+    if (!state.writable) {
+      console.warn(`[monitor] ORG - ${org.name || org.id}: SKIPPED — subscription status ${state.status}`);
+    }
+  }
   const results: any[] = [];
   const retention: any[] = [];
 
   const logTenantResult = (r: any) => {
+    const orgName = organizationNameById.get(r.organizationId) || r.organizationId || "Unknown organization";
     if (r.skipped) {
-      console.log(`[monitor] ${r.platform} - ${r.tenant}: SKIPPED — ${r.reason || "No reason supplied"}`);
+      console.log(`[monitor] ${orgName} / ${r.platform} - ${r.tenant}: SKIPPED — ${r.reason || "No reason supplied"}`);
     } else if (!r.ok) {
-      console.error(`[monitor] ${r.platform} - ${r.tenant}: FAILED — ${r.error || "Unknown error"}`);
+      console.error(`[monitor] ${orgName} / ${r.platform} - ${r.tenant}: FAILED — ${r.error || "Unknown error"}`);
     } else {
       const details = [
         typeof r.saved === "number" ? `${r.saved} saved` : null,
         typeof r.newEvents === "number" ? `${r.newEvents} new` : null,
         typeof r.incidentsCreated === "number" ? `${r.incidentsCreated} incident(s)` : null,
       ].filter(Boolean).join(", ");
-      console.log(`[monitor] ${r.platform} - ${r.tenant}: SYNCED${details ? ` — ${details}` : ""}`);
+      console.log(`[monitor] ${orgName} / ${r.platform} - ${r.tenant}: SYNCED${details ? ` — ${details}` : ""}`);
     }
   };
 
   for (const organizationId of organizationIds) {
     if (budgetRemaining() < 45_000) {
       stoppedForBudget = true;
-      console.warn(`[monitor] BUDGET — stopping before organization ${organizationId}; ${Math.max(0, budgetRemaining())}ms remain. Unprocessed tenants stay eligible for the next hourly run.`);
+      console.warn(`[monitor] BUDGET — stopping before organization ${organizationNameById.get(organizationId) || organizationId}; ${Math.max(0, budgetRemaining())}ms remain. Unprocessed tenants stay eligible for the next hourly run.`);
       break;
     }
     const organizationAlertCandidates:AlertCandidate[]=[];
@@ -90,7 +100,7 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
     );
 
     for (const tenant of microsoftTenants) {
-      if (budgetRemaining() < 45_000) { stoppedForBudget = true; console.warn(`[monitor] Microsoft 365 - ${tenant.tenant_name || tenant.tenant_id}: DEFERRED — cron safety budget reached; will retry next hourly run`); break; }
+      if (budgetRemaining() < 45_000) { stoppedForBudget = true; console.warn(`[monitor] ${organizationNameById.get(organizationId) || organizationId} / Microsoft 365 - ${tenant.tenant_name || tenant.tenant_id}: DEFERRED — cron safety budget reached; will retry next hourly run`); break; }
       const lockToken = await acquireTenantSyncLock("microsoft", tenant.id, organizationId);
       if (!lockToken) {
         const result = { organizationId, platform: "Microsoft 365", tenant: tenant.tenant_name || tenant.tenant_id, ok: true, skipped: true, reason: "Sync already in progress" };
@@ -113,7 +123,7 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
     }
 
     for (const tenant of googleTenants) {
-      if (budgetRemaining() < 45_000) { stoppedForBudget = true; console.warn(`[monitor] Google Workspace - ${tenant.display_name || tenant.primary_domain || "Google Workspace"}: DEFERRED — cron safety budget reached; will retry next hourly run`); break; }
+      if (budgetRemaining() < 45_000) { stoppedForBudget = true; console.warn(`[monitor] ${organizationNameById.get(organizationId) || organizationId} / Google Workspace - ${tenant.display_name || tenant.primary_domain || "Google Workspace"}: DEFERRED — cron safety budget reached; will retry next hourly run`); break; }
       const lockToken = await acquireTenantSyncLock("google", tenant.id, organizationId);
       if (!lockToken) {
         const result = { organizationId, platform: "Google Workspace", tenant: tenant.display_name || tenant.primary_domain || "Google Workspace", ok: true, skipped: true, reason: "Sync already in progress" };
@@ -153,7 +163,7 @@ export async function runAutomaticMonitoring(options:{sendAlerts?:boolean}={}) {
   const synced = tenantResults.filter((r: any) => r.ok && !r.skipped).length;
   const skipped = tenantResults.filter((r: any) => r.skipped).length;
   const failed = tenantResults.filter((r: any) => !r.ok).length;
-  console.log(`[monitor] SUMMARY — ${tenantResults.length} tenant(s) checked: ${synced} synced, ${skipped} skipped, ${failed} failed; budgetStop=${stoppedForBudget}`);
+  console.log(`[monitor] SUMMARY — ${tenantResults.length} tenant(s) checked across ${new Set(tenantResults.map((r:any)=>r.organizationId)).size}/${organizationIds.length} eligible organization(s): ${synced} synced, ${skipped} skipped, ${failed} failed; subscriptionSkipped=${candidateOrganizationIds.length - organizationIds.length}; budgetStop=${stoppedForBudget}`);
 
   return {
     ok: true,
