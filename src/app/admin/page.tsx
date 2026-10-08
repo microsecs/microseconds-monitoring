@@ -97,6 +97,7 @@ export default async function ProductAdminPage() {
       <div className="card"><div className="label">AI Output Tokens · 30 Days</div><div className="metric">{aiOutputTokens.toLocaleString()}</div></div>
       <div className="card"><div className="label">Est. AI Cost · 30 Days</div><div className="metric">${aiCost.toFixed(4)}</div></div>
     </div>
+    <div className="section card"><div className="adminTableHeader"><div><h2>Behavioral Learning</h2><div className="muted">Review evidence-based shadow scoring without affecting customer alerts.</div></div><Link className="btn" href="/admin/behavioral-learning">View learning diagnostics</Link></div></div>
     <RunMonitoringNow />
     <div className="section card">
       <div className="adminTableHeader"><div><h2>Customers</h2><div className="muted">Organizations, account ownership, monitoring and recent usage</div></div></div>

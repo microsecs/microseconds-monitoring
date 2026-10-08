@@ -241,3 +241,10 @@ body{min-height:100vh}
 
 /* Recovery link shown only when OAuth/authorization truly requires reconnection. */
 .tenantReconnectLink{display:inline-block;margin-top:5px;font-size:12px;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+/* Product Admin behavioral-learning diagnostics */
+.learningFilters{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:16px 0 20px}
+.learningFilters label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:12px}
+.learningFilters select{background:#101c2d;color:#e2e8f0;border:1px solid var(--line);border-radius:7px;padding:9px;max-width:260px}
+.learningFilters button{cursor:pointer}
+.learningTable{min-width:1020px}.learningTable td{vertical-align:top}.learningUser{overflow-wrap:anywhere;max-width:220px}
+.learningPages{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px;color:var(--muted);font-size:13px}.learningPages>div{display:flex;gap:10px}
