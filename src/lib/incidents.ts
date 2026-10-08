@@ -3,6 +3,7 @@ import { createIncidentAnalysis } from "@/lib/aiIncident";
 import { getEffectiveNotificationSettings, getOrganizationNotificationSettings } from "@/lib/notificationSettings";
 import { getIncidentCriteria, IncidentCriteria } from "@/lib/incidentCriteria";
 import { getRelevantIncidentFeedback } from "@/lib/incidentFeedback";
+import { recordBehaviorProfile } from "@/lib/behaviorProfiles";
 
 const uniq=(a:any[])=>Array.from(new Set(a));
 const severity=(n:number)=>n>=70?"critical":n>=40?"suspicious":"review";
@@ -108,6 +109,16 @@ export async function processProviderIncidents(x:{
   // They remain available as telemetry for future correlation/detection logic.
   const success=String(s.status||"").toLowerCase()==="success";
   if(!success) continue;
+
+  // Observation only: a profile is never a reason to trust or suppress an event.
+  // The migration must be installed before this write succeeds; a profile failure
+  // must not block incident detection or automatic monitoring.
+  try {
+   await recordBehaviorProfile({organizationId:x.organizationId,provider:x.provider,tenantRecordId:x.tenantRecordId,
+    userPrincipalName:String(s.user_principal_name||""),eventTime:s.event_time,ip:s.ip_address,
+    city:s.city||ii?.city||null,country:s.country||ii?.country||null,application:s.app_name,
+    networkProvider:ii?.provider||null,asn:ii?.asn||null});
+  } catch(profileError) { console.warn("[behavior-profile] observation failed",profileError); }
 
   const baselineEstablished=b.priorCount>=criteria.baseline_min_signins;
   const rawFindingReasons:any[]=[...(Array.isArray(f?.reasons)?f.reasons:[])];
