@@ -1,3 +1,4 @@
+import { recordBehaviorShadow } from "@/lib/behaviorShadow";
 import { getSupabaseAdmin, getOrCreateDevOrganization } from "@/lib/supabaseAdmin";
 import { createIncidentAnalysis } from "@/lib/aiIncident";
 import { getEffectiveNotificationSettings, getOrganizationNotificationSettings } from "@/lib/notificationSettings";
@@ -158,7 +159,18 @@ export async function processProviderIncidents(x:{
   const feedback=await getRelevantIncidentFeedback({organizationId:x.organizationId,provider:x.provider,tenantRecordId:x.tenantRecordId,userPrincipalName:String(s.user_principal_name||""),ip:s.ip_address,city:s.city||ii?.city||null,country:s.country||ii?.country||null,networkProvider:ii?.provider||null,asn:ii?.asn||null});
   if(feedback.safeAdjustment){score=Math.max(0,score-feedback.safeAdjustment);reasons.push("Similar activity was previously marked safe by an administrator");}
   if(feedback.suspiciousAdjustment){score+=feedback.suspiciousAdjustment;reasons.push("Similar activity was previously confirmed suspicious by an administrator");}
-  score=Math.min(100,score);if(score<criteria.incident_threshold)continue;
+  score=Math.min(100,score);
+  // Phase 2B: shadow assessment is recorded even for below-threshold sign-ins.
+  // A missing migration or telemetry failure cannot interrupt live detection.
+  try {
+   await recordBehaviorShadow({organizationId:x.organizationId,provider:x.provider,
+    tenantRecordId:x.tenantRecordId,signinId:s.id,userPrincipalName:String(s.user_principal_name||""),
+    eventTime:s.event_time,ip:s.ip_address,city:s.city||ii?.city||null,
+    country:s.country||ii?.country||null,application:s.app_name,liveScore:score,
+    feedbackSafeAdjustment:feedback.safeAdjustment||0,
+    feedbackSuspiciousAdjustment:feedback.suspiciousAdjustment||0});
+  } catch(shadowError) { console.warn("[behavior-shadow] assessment failed",shadowError); }
+  if(score<criteria.incident_threshold)continue;
 
   const allReasons=uniq([...reasons,...extra]);
   const fallback=x.provider==="google"?"Google Workspace user":"Microsoft 365 user";
