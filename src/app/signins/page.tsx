@@ -184,10 +184,8 @@ export default async function SigninsPage({
                 const incidentScore = r.incident_risk_score == null ? null : Number(r.incident_risk_score);
                 const incidentDifference = findingScore != null && Number.isFinite(findingScore) && incidentScore != null && Number.isFinite(incidentScore) && incidentScore !== findingScore
                   ? incidentScore - findingScore : null;
-                const aiRecommendation = r.ai_recommended_risk_score == null ? null : Number(r.ai_recommended_risk_score);
                 const incidentReasons = cleanRiskReasons(Array.isArray(r.incident_risk_reasons) ? r.incident_risk_reasons : []);
                 const additionalReasons = incidentReasons.filter((reason: string) => !riskReasons.includes(reason));
-                const aiSummary = typeof r.ai_summary === "string" ? r.ai_summary.trim() : "";
                 const aiClassification = typeof r.ai_classification === "string" ? r.ai_classification.toLowerCase() : "";
                 const hasRisk = riskScore != null && Number.isFinite(riskScore) && riskScore > 0 && riskReasons.length > 0;
                 return (
@@ -280,22 +278,14 @@ export default async function SigninsPage({
                         <strong>{riskScore}/100</strong>
                         <div className="subtitle" style={{ marginTop: 2 }}>
                           {riskReasons.join("; ")}
-                          {incidentDifference !== null ? (
-                            <div style={{marginTop:2}}>
-                              Incident assessment: {incidentDifference > 0 ? "+" : ""}{incidentDifference} points
-                              {aiRecommendation != null && Number.isFinite(aiRecommendation) && aiRecommendation === incidentScore && findingScore !== null && aiRecommendation > findingScore
-                                ? " (AI-recommended final score)" : " (incident assessment)"}
-                              {` · Original sign-in score: ${findingScore}/100`}
-                            </div>
-                          ) : null}
                           {additionalReasons.length ? (
-                            <div style={{marginTop:2}}>Additional incident indicators: {additionalReasons.join("; ")}</div>
+                            <div style={{ marginTop: 2 }}>{additionalReasons.join("; ")}</div>
                           ) : null}
-                          {incidentDifference !== null && aiSummary ? (
-                            <div style={{marginTop:2}}>AI review{aiClassification ? ` (${aiClassification} risk)` : ""}: {aiSummary}</div>
-                          ) : null}
-                          {incidentDifference !== null && !aiSummary ? (
-                            <div style={{marginTop:2}}>No further assessment explanation was saved for this event.</div>
+                          {incidentDifference !== null ? (
+                            <div style={{ marginTop: 2 }}>
+                              {aiClassification ? `AI: ${aiClassification} risk` : "Incident assessment"}
+                              {` (${incidentDifference > 0 ? "+" : ""}${incidentDifference})`}
+                            </div>
                           ) : null}
                         </div>
                       </div>
