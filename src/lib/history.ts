@@ -89,7 +89,7 @@ export async function getRecentHistoryPage(opts:{
   let query = supabase
     .from("signins")
     .select(
-       "id,microsoft_tenant_id,google_workspace_tenant_id,source_platform,source,event_time,user_principal_name,user_display_name,ip_address,city,region,country,app_name,status,failure_reason,microsoft_risk,incident:security_incidents(risk_score,reasons)",
+       "id,microsoft_tenant_id,google_workspace_tenant_id,source_platform,source,event_time,user_principal_name,user_display_name,ip_address,city,region,country,app_name,status,failure_reason,microsoft_risk,incident:security_incidents(risk_score,reasons,ai_recommended_risk_score)",
        {count:"exact"}
     )
     .eq("organization_id", org.id)
@@ -159,7 +159,7 @@ export async function getRecentHistoryPage(opts:{
     for (let i = 0; i < ids.length; i += 40) {
       const { data: incidents, error: ierr } = await supabase
         .from("security_incidents")
-        .select("signin_id,risk_score,reasons")
+        .select("signin_id,risk_score,reasons,ai_recommended_risk_score")
         .eq("organization_id", org.id)
         .in("signin_id", ids.slice(i, i + 40));
       if (ierr) throw new Error(ierr.message);
@@ -173,7 +173,7 @@ export async function getRecentHistoryPage(opts:{
   const candidateIncidents: any[] = [];
   for (let i = 0; i < tenantIds.length; i += 40) {
     const { data, error } = await supabase.from("security_incidents")
-      .select("signin_id,risk_score,reasons,microsoft_tenant_id,google_workspace_tenant_id")
+      .select("signin_id,risk_score,reasons,ai_recommended_risk_score,microsoft_tenant_id,google_workspace_tenant_id")
       .eq("organization_id", org.id)
       .in("microsoft_tenant_id", tenantIds.slice(i, i + 40));
     if (error) throw new Error(error.message);
@@ -181,7 +181,7 @@ export async function getRecentHistoryPage(opts:{
   }
   for (let i = 0; i < googleTenantIds.length; i += 40) {
     const { data, error } = await supabase.from("security_incidents")
-      .select("signin_id,risk_score,reasons,microsoft_tenant_id,google_workspace_tenant_id")
+      .select("signin_id,risk_score,reasons,ai_recommended_risk_score,microsoft_tenant_id,google_workspace_tenant_id")
       .eq("organization_id", org.id)
       .in("google_workspace_tenant_id", googleTenantIds.slice(i, i + 40));
     if (error) throw new Error(error.message);
@@ -250,14 +250,16 @@ export async function getRecentHistoryPage(opts:{
           ? tenantMap.get(s.microsoft_tenant_id) || null
           : "Legacy / Unassigned",
       ...(findingMap.get(s.id) || {}),
+      finding_risk_score: findingMap.get(s.id)?.risk_score ?? null,
+      finding_risk_reasons: findingMap.get(s.id)?.reasons ?? [],
       ...(() => {
         const joined = Array.isArray(s.incident) ? s.incident[0] : s.incident;
         if (joined && (joined.risk_score != null || (Array.isArray(joined.reasons) && joined.reasons.length))) {
-          return joined;
+          return {...joined, incident_risk_score: joined.risk_score};
         }
 
         const direct = incidentMap.get(s.id);
-        if (direct) return direct;
+        if (direct) return {...direct, incident_risk_score: direct.risk_score};
 
         const user = String(s.user_principal_name || "").toLowerCase();
         const ip = String(s.ip_address || "");
@@ -281,7 +283,7 @@ export async function getRecentHistoryPage(opts:{
             bestDelta = delta;
           }
         }
-        return best || {};
+        return best ? {...best, incident_risk_score: best.risk_score} : {};
       })(),
       intel_provider: intel?.provider ?? null,
       intel_asn: intel?.asn ?? null,

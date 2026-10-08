@@ -180,6 +180,11 @@ export default async function SigninsPage({
               {visibleRows.map((r: any) => {
                 const riskScore = r.risk_score == null || r.risk_score === "" ? null : Number(r.risk_score);
                 const riskReasons = cleanRiskReasons(Array.isArray(r.reasons) ? r.reasons : []);
+                const findingScore = r.finding_risk_score == null ? null : Number(r.finding_risk_score);
+                const incidentScore = r.incident_risk_score == null ? null : Number(r.incident_risk_score);
+                const incidentDifference = findingScore != null && Number.isFinite(findingScore) && incidentScore != null && Number.isFinite(incidentScore) && incidentScore !== findingScore
+                  ? incidentScore - findingScore : null;
+                const aiRecommendation = r.ai_recommended_risk_score == null ? null : Number(r.ai_recommended_risk_score);
                 const hasRisk = riskScore != null && Number.isFinite(riskScore) && riskScore > 0 && riskReasons.length > 0;
                 return (
                 <tr
@@ -271,6 +276,14 @@ export default async function SigninsPage({
                         <strong>{riskScore}/100</strong>
                         <div className="subtitle" style={{ marginTop: 2 }}>
                           {riskReasons.join("; ")}
+                          {incidentDifference !== null ? (
+                            <div style={{marginTop:2}}>
+                              Incident assessment: {incidentDifference > 0 ? "+" : ""}{incidentDifference} points
+                              {aiRecommendation != null && Number.isFinite(aiRecommendation) && aiRecommendation === incidentScore && aiRecommendation > findingScore
+                                ? " (AI recommendation)" : " (additional incident analysis)"}
+                              {` · Original sign-in score: ${findingScore}/100`}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     ) : "No risk indicators detected"}
