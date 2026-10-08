@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { domainFromMicrosoftSignIns, isGeneratedMicrosoftName } from "@/lib/microsoftTenantName";
 import {
   getAppAccessToken,
   getOrganizationProfile,
@@ -117,10 +118,13 @@ export async function GET(req: NextRequest) {
     const accessToken = await getAppAccessToken(tenantId);
 
     const profile = await getOrganizationProfileWithRetry(accessToken);
-    graphFriendlyName =
-      profile?.displayName ||
-      profile?.defaultDomain ||
-      null;
+    graphFriendlyName = profile?.displayName || profile?.defaultDomain || null;
+    // /organization may require Organization.Read.All. Use a real sign-in
+    // domain as a best-effort fallback without requesting extra permissions.
+    if (!graphFriendlyName) {
+      try { graphFriendlyName = domainFromMicrosoftSignIns(await getRecentSignIns(accessToken, 100)); }
+      catch (error) { console.warn("Microsoft tenant domain fallback unavailable", error); }
+    }
 
     try {
       const verification = await verifySignInAccessWithRetry(accessToken);
@@ -149,7 +153,7 @@ export async function GET(req: NextRequest) {
 
     // Only replace the existing name when Microsoft actually returned a real
     // organization name/domain. This preserves manual friendly-name overrides.
-    if (graphFriendlyName) {
+    if (graphFriendlyName && isGeneratedMicrosoftName(existing.tenant_name, tenantId)) {
       update.tenant_name = graphFriendlyName;
     }
 

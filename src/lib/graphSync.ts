@@ -1,3 +1,4 @@
+import { domainFromMicrosoftSignIns, isGeneratedMicrosoftName } from "@/lib/microsoftTenantName";
 import crypto from "node:crypto";
 import net from "node:net";
 import { getAppAccessToken, getRecentSignIns, getSignInsSince } from "@/lib/graph";
@@ -409,6 +410,24 @@ export async function syncMicrosoftTenant(params: {
   const rawRows = params.since
     ? await getSignInsSince(accessToken, new Date(new Date(params.since).getTime() - 10 * 60 * 1000).toISOString(), 10000)
     : await getRecentSignIns(accessToken, params.top || 250);
+
+  // Repair placeholder tenant names on subsequent manual or queued syncs.
+  // Do not overwrite names assigned by the customer.
+  try {
+    const { data: tenantNameRow } = await supabase.from("microsoft_tenants")
+      .select("tenant_name").eq("id", params.microsoftTenantRecordId)
+      .eq("organization_id", params.organizationId).maybeSingle();
+    if (tenantNameRow && isGeneratedMicrosoftName(tenantNameRow.tenant_name, params.microsoftTenantId)) {
+      const domain = domainFromMicrosoftSignIns(rawRows);
+      if (domain) {
+        await supabase.from("microsoft_tenants").update({ tenant_name: domain })
+          .eq("id", params.microsoftTenantRecordId).eq("organization_id", params.organizationId)
+          .eq("tenant_name", tenantNameRow.tenant_name);
+      }
+    }
+  } catch (error) {
+    console.warn("Microsoft tenant friendly-name repair unavailable", error);
+  }
 
   const byFingerprint = new Map<string, any>();
   for (const row of rawRows) {
