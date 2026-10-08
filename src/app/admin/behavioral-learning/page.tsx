@@ -14,8 +14,8 @@ export default async function Page({searchParams}:{searchParams:Promise<Filters>
  const orgs=or.data||[];const organization=orgs.some(x=>x.id===f.organization)?f.organization||"":"";
  const tenants=[...(ms.data||[]).map(x=>({id:x.id,organization_id:x.organization_id,name:x.tenant_name||"Microsoft",provider:"Microsoft"})),...(gs.data||[]).map(x=>({id:x.id,organization_id:x.organization_id,name:x.display_name||x.primary_domain||"Google",provider:"Google"}))].filter(x=>!organization||x.organization_id===organization);
  const tenant=tenants.some(x=>x.id===f.tenant)?f.tenant||"":"";const changed=f.changed==="1";
- const base=()=>{let q=db.from("behavior_shadow_assessments").select("*",{count:"exact"}).gte("event_time",since);if(organization)q=q.eq("organization_id",organization);if(tenant)q=q.eq("tenant_record_id",tenant);return q;};
- const [all,changedResult,records]=await Promise.all([base().select("signin_id",{head:true,count:"exact"}),base().neq("adjustment",0).select("signin_id",{head:true,count:"exact"}),changed?base().neq("adjustment",0).order("event_time",{ascending:false}).range((page-1)*PER_PAGE,page*PER_PAGE-1):base().order("event_time",{ascending:false}).range((page-1)*PER_PAGE,page*PER_PAGE-1)]);
+ const base=(head=false)=>{let q=db.from("behavior_shadow_assessments").select("*",{count:"exact",head}).gte("event_time",since);if(organization)q=q.eq("organization_id",organization);if(tenant)q=q.eq("tenant_record_id",tenant);return q;};
+ const [all,changedResult,records]=await Promise.all([base(true),base(true).neq("adjustment",0),changed?base().neq("adjustment",0).order("event_time",{ascending:false}).range((page-1)*PER_PAGE,page*PER_PAGE-1):base().order("event_time",{ascending:false}).range((page-1)*PER_PAGE,page*PER_PAGE-1)]);
  const error=all.error||changedResult.error||records.error;const total=all.count||0;const changedCount=changedResult.count||0;const filtered=changed?changedCount:total;const rows=records.data||[];
  const orgName=new Map(orgs.map(x=>[x.id,x.name||"Organization"]));const tenantName=new Map(tenants.map(x=>[x.id,x.name]));
  const query={organization,tenant,days:String(days),changed:changed?"1":""};
