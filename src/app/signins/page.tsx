@@ -279,7 +279,7 @@ export default async function SigninsPage({
                           {incidentDifference !== null ? (
                             <div style={{marginTop:2}}>
                               Incident assessment: {incidentDifference > 0 ? "+" : ""}{incidentDifference} points
-                              {aiRecommendation != null && Number.isFinite(aiRecommendation) && aiRecommendation === incidentScore && aiRecommendation > findingScore
+                              {aiRecommendation != null && Number.isFinite(aiRecommendation) && aiRecommendation === incidentScore && findingScore !== null && aiRecommendation > findingScore
                                 ? " (AI recommendation)" : " (additional incident analysis)"}
                               {` · Original sign-in score: ${findingScore}/100`}
                             </div>
