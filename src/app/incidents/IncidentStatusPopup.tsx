@@ -43,7 +43,7 @@ export default function IncidentStatusPopup(){
     style={{
       position:"fixed",
       left:"50%",
-      bottom:24,
+      top:24,
       transform:"translateX(-50%)",
       zIndex:1000,
       minWidth:280,
