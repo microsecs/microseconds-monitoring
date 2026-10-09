@@ -1,5 +1,5 @@
 import IncidentActions from "./IncidentActions";
-import DismissAllButton from "./DismissAllButton";
+import BulkIncidentActions from "./BulkIncidentActions";
 import {getIncidentQueuePage} from "@/lib/incidents";
 import IncidentStatusPopup from "./IncidentStatusPopup";
 import LocalDateTime from "@/components/LocalDateTime";
@@ -58,9 +58,6 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
     <div style={{display:"flex",gap:8,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>
      <a className="button" style={{fontSize:14}} href={`/incidents?dismissed=${includeDismissed?"0":"1"}${search?`&q=${encodeURIComponent(search)}`:""}&page=1`}>{includeDismissed?"Hide Dismissed":"Show Dismissed"}</a>
     </div>
-    <div style={{display:"flex",alignItems:"center"}}>
-     {!includeDismissed?<DismissAllButton ids={rows.filter((x:any)=>x.status!=="dismissed").map((x:any)=>x.id)}/>:null}
-    </div>
    </div>
   </div>
 
@@ -78,12 +75,14 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
     </div>)}
   </div>
 
+  <BulkIncidentActions ids={active.map((x:any)=>x.id)}/>
   {!rows.length?<div className="card"><h2 style={{marginTop:0}}>No incidents found</h2><p className="subtitle">No incidents match the current view.</p></div>:
   <div style={{display:"grid",gap:14}}>
    {rows.map((row:any)=>{const s=row.signin||{},reasons=cleanRiskReasons(Array.isArray(row.reasons)?row.reasons:[]),success=String(s.status||"").toLowerCase()==="success";
     const platform=s.source_platform==="google"?"Google Workspace":"Microsoft 365";
     const location=[s.city||s.intel?.city,s.region||s.intel?.region,s.country||s.intel?.country].filter(Boolean).join(", ")||"Unknown";
     return <div className="card" key={row.id} style={{fontSize:14,lineHeight:1.45}}>
+     {row.status!=="dismissed"?<label style={{display:"inline-flex",gap:8,alignItems:"center",marginBottom:12,cursor:"pointer"}}><input className="incident-bulk-check" type="checkbox" data-incident-select={row.id}/> Select incident</label>:null}
      <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
       <div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
        <span className={`pill ${row.severity==="critical"?"critical":row.severity==="suspicious"?"warning":"normal"}`}>{String(row.severity).toUpperCase()}</span>

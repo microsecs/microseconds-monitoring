@@ -15,9 +15,9 @@ export default function IncidentActions({incidentId,currentStatus,resolution}:{i
  if(currentStatus==="dismissed")return <div style={{marginTop:20}}><div className="subtitle">Resolution: {String(resolution||"dismissed").replaceAll("_"," ")}</div></div>;
  return <div style={{marginTop:20}}>
   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-   <button className="button" disabled={!!busy} onClick={()=>resolve("marked_safe")}>{busy==="marked_safe"?"Saving…":"Mark Safe"}</button>
-   <button className="button primary" disabled={!!busy} onClick={()=>resolve("dismissed")}>{busy==="dismissed"?"Dismissing…":"Dismiss"}</button>
-   <button className="button deleteAction" disabled={!!busy} onClick={()=>resolve("confirmed_suspicious")}>{busy==="confirmed_suspicious"?"Saving…":"Confirm Suspicious"}</button>
+   <button className="button" style={{background:"#15803d",color:"#fff",borderColor:"transparent"}} disabled={!!busy} onClick={()=>resolve("marked_safe")}>{busy==="marked_safe"?"Saving…":"Mark Safe"}</button>
+   <button className="button" style={{background:"#1d4ed8",color:"#fff",borderColor:"transparent"}} disabled={!!busy} onClick={()=>resolve("dismissed")}>{busy==="dismissed"?"Dismissing…":"Dismiss"}</button>
+   <button className="button" style={{background:"#b91c1c",color:"#fff",borderColor:"transparent"}} disabled={!!busy} onClick={()=>resolve("confirmed_suspicious")}>{busy==="confirmed_suspicious"?"Saving…":"Confirm Suspicious"}</button>
   </div>
   {error?<div className="errorBox" style={{marginTop:9}}>{error}</div>:null}
  </div>;
