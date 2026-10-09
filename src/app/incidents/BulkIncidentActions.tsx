@@ -13,7 +13,7 @@ export default function BulkIncidentActions({ids}:{ids:string[]}){
  async function apply(action:Action){
   if(busy||!chosen.length)return;
   if(!window.confirm(`${labels[action]} ${chosen.length} selected incident${chosen.length===1?"":"s"}?${action!=="dismissed"?" This decision will be recorded as behavioral-learning feedback.":""}`))return;
-  setBusy(action);setError("");
+  setBusy(action);setError("");window.dispatchEvent(new CustomEvent("microseconds:incident-working",{detail:{message:`${labels[action]}: updating ${chosen.length} incident${chosen.length===1?"":"s"}…`}}));
   try{
    const r=await fetch("/api/incidents/bulk-resolve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids:chosen,resolution:action})});
    const j=await r.json();
@@ -23,15 +23,15 @@ export default function BulkIncidentActions({ids}:{ids:string[]}){
    window.dispatchEvent(new CustomEvent("microseconds:incident-status",{detail:{message}}));
    window.dispatchEvent(new Event("microseconds:incidents-changed"));
    setSelected([]);router.refresh();
-  }catch(e:any){setError(e?.message||"Could not update incidents.");}finally{setBusy(null);}
+  }catch(e:any){setError(e?.message||"Could not update incidents.");}finally{setBusy(null);window.dispatchEvent(new Event("microseconds:incident-working-done"));}
  }
  return <>
   <div className="card" style={{marginBottom:14}}>
    <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
     <label style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer"}}><input type="checkbox" checked={ids.length>0&&chosen.length===ids.length} disabled={!!busy||!ids.length} onChange={e=>setSelected(e.target.checked?[...ids]:[])}/> Select all on this page</label>
     <span className="subtitle">{chosen.length} selected</span>
-    <button className="button" disabled={!chosen.length||!!busy} onClick={()=>setSelected([])}>Clear</button>
-    {(["marked_safe","dismissed","confirmed_suspicious"] as Action[]).map(action=><button key={action} className="button" style={{background:action==="marked_safe"?"#15803d":action==="dismissed"?"#1d4ed8":"#b91c1c",color:"#fff",borderColor:"transparent"}} disabled={!chosen.length||!!busy} onClick={()=>apply(action)}>{busy===action?"Processing…":labels[action]}</button>)}
+    <button className="button" disabled={!chosen.length||!!busy} onClick={()=>setSelected([])}>Clear Selection</button>
+    {(["marked_safe","dismissed","confirmed_suspicious"] as Action[]).map(action=><button key={action} className="button" style={{background:action==="marked_safe"?"#15803d":action==="dismissed"?"#1d4ed8":"#b91c1c",color:"#fff",borderColor:"transparent"}} disabled={!chosen.length||!!busy} onClick={()=>apply(action)}>{labels[action]}</button>)}
    </div>
    {error?<div className="errorBox" style={{marginTop:10}}>{error}</div>:null}
   </div>

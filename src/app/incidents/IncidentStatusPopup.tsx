@@ -5,6 +5,7 @@ const STORAGE_KEY="microseconds:incident-status";
 
 export default function IncidentStatusPopup(){
   const [message,setMessage]=useState("");
+  const [working,setWorking]=useState("");
 
   useEffect(()=>{
     const stored=sessionStorage.getItem(STORAGE_KEY);
@@ -17,8 +18,16 @@ export default function IncidentStatusPopup(){
       const detail=(event as CustomEvent<{message?:string}>).detail;
       if(detail?.message)setMessage(detail.message);
     };
+    const onWorking=(event:Event)=>setWorking((event as CustomEvent<{message?:string}>).detail?.message||"Working…");
+    const onDone=()=>setWorking("");
+    window.addEventListener("microseconds:incident-working",onWorking);
+    window.addEventListener("microseconds:incident-working-done",onDone);
     window.addEventListener("microseconds:incident-status",onStatus);
-    return ()=>window.removeEventListener("microseconds:incident-status",onStatus);
+    return ()=>{
+      window.removeEventListener("microseconds:incident-status",onStatus);
+      window.removeEventListener("microseconds:incident-working",onWorking);
+      window.removeEventListener("microseconds:incident-working-done",onDone);
+    };
   },[]);
 
   useEffect(()=>{
@@ -27,7 +36,7 @@ export default function IncidentStatusPopup(){
     return ()=>window.clearTimeout(timer);
   },[message]);
 
-  if(!message)return null;
+  if(!message&&!working)return null;
   return <div
     role="status"
     aria-live="polite"
@@ -48,5 +57,5 @@ export default function IncidentStatusPopup(){
       fontWeight:600,
       textAlign:"center"
     }}
-  >{message}</div>;
+  >{working||message}</div>;
 }
