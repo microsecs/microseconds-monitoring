@@ -44,7 +44,13 @@ export async function sendSmtpMail(p:{from:string;to:string;subject:string;html:
     const code=Number(line.slice(0,3));
     if(code>=400){ fail(new Error(`SMTP ${code}: ${line.slice(4)}`)); return; }
     if(stage===0 && code!==220) continue;
-    if(stage===8 && code===221){ if(!finished){finished=true; socket.end(); resolve({messageId});} return; }
+    // Stage 8 is the server response to the message body. A 250 here means
+    // the server accepted the message; do not wait for the optional QUIT/221
+    // exchange before returning success to the UI.
+    if(stage===8 && code===250){
+     if(!finished){finished=true; send("QUIT"); socket.end(); resolve({messageId});}
+     return;
+    }
     const fn=commands[stage++]; if(fn) fn();
    }
   });

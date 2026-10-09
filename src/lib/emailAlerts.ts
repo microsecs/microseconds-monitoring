@@ -18,9 +18,15 @@ function badge(sev:any){
  const bg=level==="critical"?"#7f1d1d":"#92400e";
  return `<span style="display:inline-block;background:${bg};color:#fff;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700;letter-spacing:.04em">${escapeHtml(s)}</span>`;
 }
-function utcTime(v:any){
+// Emails are rendered on the server, so the recipient's device timezone is unavailable.
+// Use an explicitly configured display timezone (Pacific by default), with its abbreviation.
+function alertTime(v:any){
  const d=new Date(String(v||""));
- return Number.isNaN(d.getTime())?String(v||"Unknown"):`${d.toLocaleString("en-US",{timeZone:"UTC",year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",second:"2-digit"})} UTC`;
+ if(Number.isNaN(d.getTime()))return String(v||"Unknown");
+ const configured=process.env.SECURITY_ALERT_TIME_ZONE||"America/Los_Angeles";
+ let timeZone=configured;
+ try { new Intl.DateTimeFormat("en-US",{timeZone}).format(d); } catch {timeZone="America/Los_Angeles";}
+ return d.toLocaleString("en-US",{timeZone,year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",second:"2-digit",timeZoneName:"short"});
 }
 
 export type AlertCandidate={organizationId:string;incident:any;signin:any;tenantName:string;provider:"microsoft"|"google"|string};
@@ -110,7 +116,7 @@ export function renderSecurityAlertEmail(candidates:AlertCandidate[], intelByIp:
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr><td style="font-size:15px;font-weight:bold;color:#172033">${escapeHtml(user)}</td><td align="right" style="font-size:12px;font-weight:bold;color:${color}">${escapeHtml(severity)} · ${escapeHtml(inc.risk_score??"?")}/100</td></tr></table>
     ${email&&email.toLowerCase()!==user.toLowerCase()?`<div style="font-size:13px;color:#334155;margin-top:5px;word-break:break-word">${escapeHtml(email).replace("@","&#8288;@&#8288;")}</div>`:""}
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:9px;width:100%">
-    ${line("Location",location)}${line("IP address",String(si.ip_address||"Unavailable"))}${line("Sign-in (UTC)",utcTime(si.event_time))}${line("Risk factors",reasons)}
+    ${line("Location",location)}${line("IP address",String(si.ip_address||"Unavailable"))}${line("Sign-in time",alertTime(si.event_time))}${line("Risk factors",reasons)}
     </table></td></tr>`;
   }).join("");
   return `<tr><td style="padding:20px 24px 0"><div style="font-size:15px;font-weight:bold;color:#172033">${escapeHtml(first.tenantName||"Unknown tenant")}</div><div style="font-size:12px;color:#64748b;margin-top:3px">${escapeHtml(platform)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${events}</table></td></tr>`;
@@ -122,7 +128,7 @@ export function renderSecurityAlertEmail(candidates:AlertCandidate[], intelByIp:
  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#ffffff;border:1px solid #dce3eb">
  <tr><td class="content" style="padding:24px;border-bottom:1px solid #e5e7eb"><div style="font-size:14px;font-weight:bold;letter-spacing:.04em;color:#0f766e">MicroSECONDS Monitoring</div><h1 style="font-size:23px;line-height:1.25;color:#172033;margin:14px 0 8px">${test?"TEST — Security Notification":"Security Notification"}</h1><div style="font-size:14px;line-height:1.5;color:#475569">${test?"This is a sample notification. No real incidents were created.":"Automatic monitoring identified successful sign-ins requiring review."}</div><div style="font-size:12px;color:#64748b;margin-top:12px">${counts}</div></td></tr>
  ${blocks}
- <tr><td class="content" style="padding:24px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="#0f766e" style="background-color:#0f766e;padding:12px 18px"><a href="${url}" style="color:#ffffff!important;font-size:14px;font-weight:bold;text-decoration:none">Review Incidents &rarr;</a></td></tr></table><p style="font-size:12px;line-height:1.5;color:#64748b;margin:20px 0 0">Sign-in times are shown in UTC. Visit MicroSECONDS Monitoring for investigation details and local-time history.${test?" This is a test message; its sample users and IPs are fictional.":""}</p></td></tr>
+ <tr><td class="content" style="padding:24px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding:0"><a href="${url}" style="display:inline-block;color:#075985!important;font-size:16px;font-weight:bold;text-decoration:underline;text-underline-offset:3px;padding:10px 0">Review Incidents &rarr;</a></td></tr></table><p style="font-size:12px;line-height:1.5;color:#64748b;margin:20px 0 0">Sign-in times include their displayed timezone. Visit MicroSECONDS Monitoring for investigation details and browser-local history.${test?" This is a test message; its sample users and IPs are fictional.":""}</p></td></tr>
  <tr><td style="padding:16px 24px;background-color:#f8fafc;border-top:1px solid #e5e7eb;font-size:11px;color:#64748b">MicroSECONDS Monitoring · Automated security notification</td></tr>
  </table></td></tr></table></body></html>`;
 }
