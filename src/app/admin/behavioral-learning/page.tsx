@@ -18,26 +18,51 @@ export default async function Page({searchParams}:{searchParams:Promise<Filters>
  const base=(head=false)=>{let q=db.from("behavior_shadow_assessments").select("*",{count:"exact",head}).gte("event_time",since);if(organization)q=q.eq("organization_id",organization);if(tenant)q=q.eq("tenant_record_id",tenant);return q;};
  const [all,changedResult,records]=await Promise.all([base(true),base(true).neq("adjustment",0),changed?base().neq("adjustment",0).order("event_time",{ascending:false}).range((page-1)*PER_PAGE,page*PER_PAGE-1):base().order("event_time",{ascending:false}).range((page-1)*PER_PAGE,page*PER_PAGE-1)]);
  const error=all.error||changedResult.error||records.error;const total=all.count||0;const changedCount=changedResult.count||0;const filtered=changed?changedCount:total;const rows=records.data||[];
- // Validation is based on the visible page only, never misrepresented as global accuracy.
- // Match incidents by sign-in ID AND organization ID; shared external tenants are independent.
- const rowIds=rows.map(r=>r.signin_id).filter(Boolean);
- const [incidentLookup,thresholdLookup]=await Promise.all([
-   rowIds.length?db.from("security_incidents").select("signin_id,organization_id,resolution").in("signin_id",rowIds):Promise.resolve({data:[],error:null}),
-   db.from("incident_criteria_settings").select("organization_id,incident_threshold")
+ // Aggregate the entire filtered assessment set, not merely the visible table page.
+ // Hard cap protects the admin request from unbounded database reads; a capped
+ // result is clearly labeled incomplete and must not be represented as global.
+ const VALIDATION_LIMIT=20000;
+ const CHUNK=500;
+ const validationRows:any[]=[];
+ let validationFetchError="";
+ const validationCount=filtered;
+ for(let offset=0;offset<Math.min(validationCount,VALIDATION_LIMIT);offset+=CHUNK){
+   let q=db.from("behavior_shadow_assessments")
+     .select("signin_id,organization_id,live_score,proposed_score,adjustment,event_time")
+     .gte("event_time",since);
+   if(organization)q=q.eq("organization_id",organization);
+   if(tenant)q=q.eq("tenant_record_id",tenant);
+   if(changed)q=q.neq("adjustment",0);
+   const batch=await q.order("event_time",{ascending:false}).order("signin_id",{ascending:false}).range(offset,Math.min(offset+CHUNK,VALIDATION_LIMIT)-1);
+   if(batch.error){validationFetchError=batch.error.message;break;}
+   validationRows.push(...(batch.data||[]));
+   if((batch.data||[]).length<CHUNK)break;
+ }
+ const complete=!validationFetchError&&validationRows.length===validationCount;
+ const rowIds=validationRows.map(r=>r.signin_id).filter(Boolean);
+ const [thresholdLookup,...incidentChunks]=await Promise.all([
+   db.from("incident_criteria_settings").select("organization_id,incident_threshold"),
+   ...Array.from({length:Math.ceil(rowIds.length/CHUNK)},(_,i)=>db.from("security_incidents")
+     .select("signin_id,organization_id,resolution")
+     .in("signin_id",rowIds.slice(i*CHUNK,(i+1)*CHUNK)))
  ]);
- const validationError=incidentLookup.error||thresholdLookup.error;
+ const validationError=[validationFetchError,thresholdLookup.error?.message,...incidentChunks.map(x=>x.error?.message)].filter(Boolean).join("; ");
  const incidentByKey=new Map<string,string>();
- for(const inc of incidentLookup.data||[]){incidentByKey.set(`${inc.organization_id}:${inc.signin_id}`,String(inc.resolution||""));}
+ for(const result of incidentChunks){for(const inc of result.data||[]){incidentByKey.set(`${inc.organization_id}:${inc.signin_id}`,String(inc.resolution||""));}}
  const thresholdByOrg=new Map<string,number>();
- for(const setting of thresholdLookup.data||[]){thresholdByOrg.set(setting.organization_id,Number(setting.incident_threshold));}
+ for(const setting of thresholdLookup.data||[]){const n=Number(setting.incident_threshold);if(Number.isFinite(n))thresholdByOrg.set(setting.organization_id,n);}
  const thresholdFor=(orgId:string)=>thresholdByOrg.get(orgId)??DEFAULT_INCIDENT_CRITERIA.incident_threshold;
  const outcomeFor=(r:any)=>incidentByKey.get(`${r.organization_id}:${r.signin_id}`)||"";
  const impactFor=(r:any)=>{const threshold=thresholdFor(r.organization_id);const live=Number(r.live_score)>=threshold;const proposed=Number(r.proposed_score)>=threshold;return live===proposed?"No change":proposed?"Would cross threshold":"Would fall below threshold";};
- const reviewed=rows.filter(r=>["marked_safe","confirmed_suspicious"].includes(outcomeFor(r)));
+ const reviewed=validationRows.filter(r=>["marked_safe","confirmed_suspicious"].includes(outcomeFor(r)));
  const safe=reviewed.filter(r=>outcomeFor(r)==="marked_safe").length;
  const suspicious=reviewed.filter(r=>outcomeFor(r)==="confirmed_suspicious").length;
- const newCrossings=rows.filter(r=>impactFor(r)==="Would cross threshold").length;
- const lostCrossings=rows.filter(r=>impactFor(r)==="Would fall below threshold").length;
+ const newCrossings=validationRows.filter(r=>impactFor(r)==="Would cross threshold").length;
+ const lostCrossings=validationRows.filter(r=>impactFor(r)==="Would fall below threshold").length;
+ const safeRaised=reviewed.filter(r=>outcomeFor(r)==="marked_safe"&&Number(r.adjustment)>0).length;
+ const suspiciousRaised=reviewed.filter(r=>outcomeFor(r)==="confirmed_suspicious"&&Number(r.adjustment)>0).length;
+ const safeLowered=reviewed.filter(r=>outcomeFor(r)==="marked_safe"&&Number(r.adjustment)<0).length;
+ const suspiciousLowered=reviewed.filter(r=>outcomeFor(r)==="confirmed_suspicious"&&Number(r.adjustment)<0).length;
  // Resolve the account owner's login email using the same membership relationship as Product Admin.
  const members=membersResult.data||[];
  const ownerByOrg=new Map<string,string>();
@@ -61,10 +86,11 @@ export default async function Page({searchParams}:{searchParams:Promise<Filters>
  const query={organization,tenant,days:String(days),changed:changed?"1":""};
  return <><div className="adminBack"><Link href="/admin">← Product Admin</Link></div><div className="topbar"><div><div className="title">Behavioral Learning</div><div className="subtitle">Shadow mode · No impact on live risk scores, incidents or alerts</div></div></div>
  <div className="grid4 adminMetrics"><div className="card"><div className="label">Assessments · {days} days</div><div className="metric">{total.toLocaleString()}</div></div><div className="card"><div className="label">Proposed changes</div><div className="metric">{changedCount.toLocaleString()}</div></div><div className="card"><div className="label">Unchanged</div><div className="metric">{(total-changedCount).toLocaleString()}</div></div><div className="card"><div className="label">Changed share</div><div className="metric">{total?(100*changedCount/total).toFixed(1):"0.0"}%</div></div></div>
- <div className="section card"><h2>Learning validation · current page</h2><div className="muted">These metrics cover only the {rows.length} assessments displayed on this page, not all {filtered.toLocaleString()} matching records. Decisions are verified administrator outcomes; unreviewed and dismissed incidents are excluded. Threshold comparison uses each customer’s current configured threshold, not necessarily the threshold at event time. Live is the deterministic pre-AI score.</div>
+ <div className="section card"><h2>Learning validation · selected filters</h2><div className="muted">{complete?`Across all ${validationRows.length.toLocaleString()} matching assessments.`:`Partial results: ${validationRows.length.toLocaleString()} of ${validationCount.toLocaleString()} matching assessments. Metrics below are incomplete${validationCount>VALIDATION_LIMIT?` (limit ${VALIDATION_LIMIT.toLocaleString()})`:""}.`} Verified administrator decisions only; dismissed and unreviewed events are excluded from feedback comparisons. Threshold comparisons use each customer’s current configured threshold, not necessarily the threshold at event time. Live is the deterministic pre-AI score.</div>
  <div className="grid4 adminMetrics" style={{marginTop:14}}><div className="card"><div className="label">Verified Safe</div><div className="metric">{safe}</div></div><div className="card"><div className="label">Confirmed Suspicious</div><div className="metric">{suspicious}</div></div><div className="card"><div className="label">Would cross threshold</div><div className="metric">{newCrossings}</div></div><div className="card"><div className="label">Would fall below threshold</div><div className="metric">{lostCrossings}</div></div></div>
- {validationError?<div className="muted">Validation lookup unavailable: {validationError.message}</div>:null}
- <div className="muted">{reviewed.length?`${reviewed.length} reviewed outcomes on this page. These counts do not establish predictive accuracy or a false-positive rate.`:"No verified Safe or Suspicious decisions on this page yet; accuracy cannot be evaluated."}</div></div>
+ <div className="muted" style={{marginTop:12}}>Verified Safe: {safeRaised} raised, {safeLowered} lowered. Confirmed Suspicious: {suspiciousRaised} raised, {suspiciousLowered} lowered. These comparisons are directional evidence, not proof of accuracy; only sign-ins with recorded incident decisions are labeled.</div>
+ {validationError?<div className="muted">Validation lookup incomplete: {validationError}</div>:null}
+ <div className="muted">{reviewed.length?`${reviewed.length} verified outcomes in the selected assessment set. Review sample size and selection bias before interpreting results.`:"No verified Safe or Suspicious decisions in the selected assessment set yet; accuracy cannot be evaluated."}</div></div>
  <div className="section card"><div className="adminTableHeader"><div><h2>Shadow assessments</h2><div className="muted">UTC timestamps. A proposed adjustment does not necessarily mean improved accuracy.</div></div></div>
  <form method="get" action="/admin/behavioral-learning" className="learningFilters"><label>Period<select name="days" defaultValue={String(days)}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option></select></label><label>Customer<select name="organization" defaultValue={organization}><option value="">All customers</option>{orgs.map(x=><option key={x.id} value={x.id}>{customerEmail.get(x.id)||"Unknown customer"}</option>)}</select></label><label>Tenant<select name="tenant" defaultValue={tenant}><option value="">All tenants</option>{tenants.map(x=><option key={x.id} value={x.id}>{x.name} ({x.provider})</option>)}</select></label><label>Changes<select name="changed" defaultValue={changed?"1":""}><option value="">All</option><option value="1">Changed only</option></select></label><button type="submit" className="btn">Apply</button></form>
  {error?<div className="adminComingSoon">Unable to load assessments: {error.message}. Verify the Phase 2B SQL migration.</div>:rows.length?<><div className="tableScroll"><table className="table learningTable"><thead><tr><th>Sign-in (UTC)</th><th>Customer Email</th><th>Tenant</th><th>Sign-in User</th><th>Live</th><th>Proposed</th><th>Change</th><th>Admin Decision</th><th>Threshold Impact</th><th>Evidence</th></tr></thead><tbody>{rows.map(r=><tr key={r.signin_id}><td>{new Date(r.event_time).toLocaleString("en-US",{timeZone:"UTC",timeZoneName:"short"})}</td><td className="learningUser">{customerEmail.get(r.organization_id)||"Unknown customer"}</td><td>{tenantName.get(`${r.organization_id}:${r.tenant_record_id}`)||"Unknown tenant"}</td><td className="learningUser">{r.user_principal_name}</td><td>{r.live_score}</td><td>{r.proposed_score}</td><td>{r.adjustment>0?"+":""}{r.adjustment}</td><td>{outcomeFor(r)==="marked_safe"?"Verified Safe":outcomeFor(r)==="confirmed_suspicious"?"Confirmed Suspicious":outcomeFor(r)==="dismissed"?"Dismissed (neutral)":"Unreviewed / no incident"}</td><td>{impactFor(r)}<div className="muted">Threshold: {thresholdFor(r.organization_id)}</div></td><td>{Array.isArray(r.reasons)&&r.reasons.length?r.reasons.join("; "):"No adjustment"}<div className="muted">Historical sign-ins: {r.history_count}</div></td></tr>)}</tbody></table></div><div className="learningPages"><span>Page {page} · {filtered.toLocaleString()} matching</span><div>{page>1&&<Link className="btn" href={url({...query,page:String(page-1)})}>Previous</Link>}{page*PER_PAGE<filtered&&<Link className="btn" href={url({...query,page:String(page+1)})}>Next</Link>}</div></div></>:<div className="empty">No assessments match these filters.</div>}</div><div className="adminComingSoon">Shadow scoring remains observation-only. Administrator decisions are not ground-truth labels for every sign-in; validate larger samples before changing production scoring.</div></>;
