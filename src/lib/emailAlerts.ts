@@ -55,33 +55,9 @@ export async function sendConsolidatedIncidentAlert(params:{organizationId:strin
   const pending=candidates.filter(x=>!done.has(String(x.incident.id)));
   if(!pending.length){ console.log(`[alerts] ${params.organizationId}: ${recipient} has no pending incidents`); continue; }
 
-  const critical=pending.filter(x=>String(x.incident?.severity).toLowerCase()==="critical").length;
-  const suspicious=pending.filter(x=>String(x.incident?.severity).toLowerCase()==="suspicious").length;
-  const low=pending.length-critical-suspicious;
-  const tenants=new Map<string,AlertCandidate[]>();
-  for(const x of pending){const k=`${x.provider}|${x.tenantName}`;tenants.set(k,[...(tenants.get(k)||[]),x]);}
-  const groups=Array.from(tenants.values()).map(items=>{
-    const first=items[0];
-    const platform=first.provider==="google"?"Google Workspace":"Microsoft 365";
-    const rows=items.map(x=>{
-      const si=x.signin||{},inc=x.incident||{};
-      const user=si.user_display_name||si.user_principal_name||"Unknown user";
-      const email=si.user_principal_name||"";
-      const showEmail=email && String(email).toLowerCase()!==String(user).toLowerCase();
-      // Word-joiner prevents aggressive email clients from auto-linking and recoloring addresses.
-      const displayEmail=escapeHtml(email).replace("@", "&#8288;@&#8288;").replaceAll(".", "&#8288;.&#8288;");
-      const ipIntel=alertIntelByIp.get(String(si.ip_address||""))||{};
-      const loc=[si.city||ipIntel.city,si.region||ipIntel.region,si.country||ipIntel.country].filter(Boolean).join(", ")||"Location unavailable";
-      const reasons=Array.isArray(inc.reasons)?inc.reasons.slice(0,3).map((r:any)=>escapeHtml(r)).join(" · "):"Risk threshold exceeded";
-      const severityBadge=badge(inc.severity);
-      return `<div style="padding:14px 0;border-top:1px solid #273244"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><strong style="color:#f8fafc">${escapeHtml(user)}</strong>${severityBadge}</div>${showEmail?`<div class="plainEmail" style="color:#f1f5f9 !important;font-size:13px;font-weight:500;margin-top:5px;text-decoration:none !important;word-break:break-word">${displayEmail}</div>`:""}<div style="color:#cbd5e1;font-size:13px;margin-top:6px">${escapeHtml(loc)} · ${escapeHtml(si.ip_address||"Unknown IP")} · Risk ${escapeHtml(inc.risk_score??"?")}/100</div><div style="color:#94a3b8;font-size:12px;margin-top:5px">${escapeHtml(utcTime(si.event_time))}</div><div style="color:#fbbf24;font-size:12px;margin-top:7px">${reasons}</div></div>`;
-    }).join("");
-    return `<div style="margin-top:22px"><div style="font-size:15px;font-weight:700;color:#f8fafc">${escapeHtml(first.tenantName)} <span style="font-weight:400;color:#94a3b8">· ${platform}</span></div>${rows}</div>`;
-  }).join("");
+  const html=renderSecurityAlertEmail(pending, alertIntelByIp);
   const count=pending.length;
   const subject=`Security Alert: ${count} Incident${count===1?"":"s"}`;
-  const reviewUrl=`${appUrl()}/incidents`;
-  const html=`<!doctype html><html><head><style>a[x-apple-data-detectors], .plainEmail, .plainEmail a { color:#f1f5f9 !important; text-decoration:none !important; }</style></head><body style="margin:0;background:#0b1220;font-family:Arial,sans-serif;color:#e5e7eb"><div style="max-width:720px;margin:0 auto;padding:30px 18px"><div style="background:#111827;border:1px solid #263244;border-radius:14px;overflow:hidden"><div style="padding:24px 26px;border-bottom:1px solid #263244"><div style="font-size:13px;color:#60a5fa;font-weight:700;letter-spacing:.06em">MICROSECONDS MONITORING</div><h1 style="margin:8px 0 4px;font-size:24px;color:#fff">Security Alert</h1><div style="color:#cbd5e1">Automatic monitoring detected ${count} successful sign-in${count===1?"":"s"} requiring review.</div></div><div style="padding:22px 26px"><div style="display:flex;gap:12px;flex-wrap:wrap"><div style="background:#0f172a;border:1px solid #273244;border-radius:10px;padding:10px 14px"><strong style="font-size:20px;color:#fff">${count}</strong><div style="font-size:11px;color:#94a3b8">TOTAL</div></div><div style="background:#0f172a;border:1px solid #273244;border-radius:10px;padding:10px 14px"><strong style="font-size:20px;color:#fca5a5">${critical}</strong><div style="font-size:11px;color:#94a3b8">CRITICAL</div></div><div style="background:#0f172a;border:1px solid #273244;border-radius:10px;padding:10px 14px"><strong style="font-size:20px;color:#fcd34d">${suspicious}</strong><div style="font-size:11px;color:#94a3b8">SUSPICIOUS</div></div><div style="background:#0f172a;border:1px solid #273244;border-radius:10px;padding:10px 14px"><strong style="font-size:20px;color:#93c5fd">${low}</strong><div style="font-size:11px;color:#94a3b8">LOW / REVIEW</div></div></div>${groups}<div style="margin-top:26px"><a href="${escapeHtml(reviewUrl)}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:9px">Review Incidents</a></div><p style="color:#94a3b8;font-size:12px;line-height:1.5;margin-top:24px">Times in this email are shown in UTC. Sign in to MicroSECONDS Monitoring to review local-time event details, IP intelligence, risk factors, and investigation controls.</p></div></div></div></body></html>`;
   console.log(`[alerts] ${params.organizationId}: sending ${pending.length} incident(s) to ${recipient} via SMTP`);
   let smtpResult:{messageId:string};
   try {
@@ -104,4 +80,62 @@ export async function sendConsolidatedIncidentAlert(params:{organizationId:strin
  }
  console.log(`[alerts] ${params.organizationId}: completed; emailsSent=${sent}, incidentsAlerted=${incidentsAlerted}`);
  return {sent,incidentsAlerted};
+}
+
+/** One shared email template for scheduled alerts and Product Admin samples. */
+export function renderSecurityAlertEmail(candidates:AlertCandidate[], intelByIp:Map<string,any>=new Map(), test=false){
+ const critical=candidates.filter(x=>String(x.incident?.severity).toLowerCase()==="critical").length;
+ const suspicious=candidates.filter(x=>["suspicious","high"].includes(String(x.incident?.severity).toLowerCase())).length;
+ const review=candidates.length-critical-suspicious;
+ const counts=`${candidates.length} total &nbsp;·&nbsp; ${critical} critical &nbsp;·&nbsp; ${suspicious} suspicious &nbsp;·&nbsp; ${review} low / review`;
+ const groups=new Map<string,AlertCandidate[]>();
+ for(const item of candidates){
+  const key=`${item.provider}|${item.tenantName}`;
+  groups.set(key,[...(groups.get(key)||[]),item]);
+ }
+ const line=(label:string,value:string)=>`<tr><td style="padding:3px 10px 3px 0;color:#64748b;font-size:13px;vertical-align:top;white-space:nowrap">${escapeHtml(label)}</td><td style="padding:3px 0;color:#172033;font-size:13px;vertical-align:top;overflow-wrap:anywhere;word-break:break-word">${escapeHtml(value)}</td></tr>`;
+ const blocks=Array.from(groups.values()).map(items=>{
+  const first=items[0];
+  const platform=first.provider==="google"?"Google Workspace":"Microsoft 365";
+  const events=items.map(item=>{
+   const si=item.signin||{},inc=item.incident||{};
+   const intel=intelByIp.get(String(si.ip_address||""))||{};
+   const location=[si.city||intel.city,si.region||intel.region,si.country||intel.country].filter(Boolean).join(", ")||"Unavailable";
+   const user=String(si.user_display_name||si.user_principal_name||"Unknown user");
+   const email=String(si.user_principal_name||"");
+   const reasons=Array.isArray(inc.reasons)&&inc.reasons.length?inc.reasons.slice(0,4).map(String).join("; "):"See incident details for risk factors";
+   const severity=String(inc.severity||"review").toUpperCase();
+   const color=severity==="CRITICAL"?"#b91c1c":severity==="SUSPICIOUS"||severity==="HIGH"?"#92400e":"#475569";
+   return `<tr><td style="padding:16px 0;border-bottom:1px solid #e5e7eb">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr><td style="font-size:15px;font-weight:bold;color:#172033">${escapeHtml(user)}</td><td align="right" style="font-size:12px;font-weight:bold;color:${color}">${escapeHtml(severity)} · ${escapeHtml(inc.risk_score??"?")}/100</td></tr></table>
+    ${email&&email.toLowerCase()!==user.toLowerCase()?`<div style="font-size:13px;color:#334155;margin-top:5px;word-break:break-word">${escapeHtml(email).replace("@","&#8288;@&#8288;")}</div>`:""}
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:9px;width:100%">
+    ${line("Location",location)}${line("IP address",String(si.ip_address||"Unavailable"))}${line("Sign-in (UTC)",utcTime(si.event_time))}${line("Risk factors",reasons)}
+    </table></td></tr>`;
+  }).join("");
+  return `<tr><td style="padding:20px 24px 0"><div style="font-size:15px;font-weight:bold;color:#172033">${escapeHtml(first.tenantName||"Unknown tenant")}</div><div style="font-size:12px;color:#64748b;margin-top:3px">${escapeHtml(platform)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${events}</table></td></tr>`;
+ }).join("");
+ const url=escapeHtml(`${appUrl()}/incidents`);
+ return `<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><style>:root{color-scheme:light;supported-color-schemes:light}a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important} @media only screen and (max-width:600px){.outer{padding:12px!important}.content{padding:18px!important}}</style></head>
+ <body style="margin:0;padding:0;background-color:#f1f5f9;color:#172033;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%">
+ <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9"><tr><td class="outer" align="center" style="padding:26px 12px">
+ <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#ffffff;border:1px solid #dce3eb">
+ <tr><td class="content" style="padding:24px;border-bottom:1px solid #e5e7eb"><div style="font-size:14px;font-weight:bold;letter-spacing:.04em;color:#0f766e">MicroSECONDS Monitoring</div><h1 style="font-size:23px;line-height:1.25;color:#172033;margin:14px 0 8px">${test?"TEST — Security Notification":"Security Notification"}</h1><div style="font-size:14px;line-height:1.5;color:#475569">${test?"This is a sample notification. No real incidents were created.":"Automatic monitoring identified successful sign-ins requiring review."}</div><div style="font-size:12px;color:#64748b;margin-top:12px">${counts}</div></td></tr>
+ ${blocks}
+ <tr><td class="content" style="padding:24px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="#0f766e" style="background-color:#0f766e;padding:12px 18px"><a href="${url}" style="color:#ffffff!important;font-size:14px;font-weight:bold;text-decoration:none">Review Incidents &rarr;</a></td></tr></table><p style="font-size:12px;line-height:1.5;color:#64748b;margin:20px 0 0">Sign-in times are shown in UTC. Visit MicroSECONDS Monitoring for investigation details and local-time history.${test?" This is a test message; its sample users and IPs are fictional.":""}</p></td></tr>
+ <tr><td style="padding:16px 24px;background-color:#f8fafc;border-top:1px solid #e5e7eb;font-size:11px;color:#64748b">MicroSECONDS Monitoring · Automated security notification</td></tr>
+ </table></td></tr></table></body></html>`;
+}
+
+export function sampleAlertCandidates(type:"single"|"multiple"|"critical"):AlertCandidate[]{
+ const now=new Date().toISOString();
+ const make=(id:string,user:string,tenant:string,score:number,severity:string,ip:string,provider:string):AlertCandidate=>({
+  organizationId:"TEST-ONLY",tenantName:tenant,provider,
+  incident:{id:`test-${id}`,risk_score:score,severity,reasons:severity==="critical"?["Unfamiliar country","Unrecognized network","Unusual sign-in pattern"]:["VPN detected","Unfamiliar IP address"]},
+  signin:{user_display_name:user,user_principal_name:`${id}@example.com`,ip_address:ip,city:"Example City",region:"California",country:"US",event_time:now}
+ });
+ const one=make("alex","Alex Example","Example Microsoft Tenant",65,"suspicious","192.0.2.10","microsoft");
+ if(type==="single")return [one];
+ if(type==="critical")return [make("jordan","Jordan Example","Example Microsoft Tenant",92,"critical","198.51.100.25","microsoft")];
+ return [one,make("taylor","Taylor Example","Example Google Tenant",30,"review","203.0.113.15","google")];
 }

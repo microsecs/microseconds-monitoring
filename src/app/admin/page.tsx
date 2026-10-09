@@ -3,6 +3,8 @@ import { requireProductAdmin } from "@/lib/productAdmin";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { subscriptionState } from "@/lib/subscription";
 import RunMonitoringNow from "@/components/RunMonitoringNow";
+import TestSecurityEmail from "@/components/TestSecurityEmail";
+import { getProductAdminEmail } from "@/lib/productAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +101,7 @@ export default async function ProductAdminPage() {
     </div>
     <div className="section card"><div className="adminTableHeader"><div><h2>Behavioral Learning</h2><div className="muted">Review evidence-based shadow scoring without affecting customer alerts.</div></div><Link className="btn" href="/admin/behavioral-learning">View learning diagnostics</Link></div></div>
     <RunMonitoringNow />
+    <TestSecurityEmail defaultEmail={getProductAdminEmail()} />
     <div className="section card">
       <div className="adminTableHeader"><div><h2>Customers</h2><div className="muted">Organizations, account ownership, monitoring and recent usage</div></div></div>
       {rows.length ? <div className="tableScroll"><table className="table adminCustomerTable"><thead><tr><th>Organization</th><th>Owner</th><th>Plan</th><th>Status</th><th>Trial Ends</th><th>Tenants</th><th>Users</th><th>Monitoring</th><th>30d Sign-ins</th><th>30d Incidents</th><th>AI Reviews</th><th>Est. AI Cost</th><th>Last Sync</th></tr></thead><tbody>
