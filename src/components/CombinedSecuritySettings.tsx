@@ -107,7 +107,7 @@ export default function CombinedSecuritySettings({showPageHeader=false}:{showPag
 
   <div className="card" id="notifications" style={{padding:22}}>
    <div style={{display:"flex",justifyContent:"space-between",gap:20,alignItems:"center",flexWrap:"wrap"}}>
-    <div><h2 style={{margin:"0 0 5px"}}>Email Alerts</h2><div className="subtitle">Optionally send an email whenever the incident threshold is reached.</div></div>
+    <div><h2 style={{margin:"0 0 5px"}}>Email Incident Alerts</h2><div className="subtitle">Optionally send an email whenever the incident threshold is reached.</div></div>
     <div style={{display:"flex",alignItems:"center",gap:10}}><strong>Send email alert</strong><Toggle checked={!!notify.enabled&&notify.alert_successful_suspicious!==false} onChange={v=>{n("enabled",v);n("alert_successful_suspicious",v)}} label="Send email alerts"/></div>
    </div>
    <div style={{opacity:notify.enabled&&notify.alert_successful_suspicious!==false?1:.5,pointerEvents:notify.enabled&&notify.alert_successful_suspicious!==false?"auto":"none",marginTop:18}}>
@@ -120,7 +120,6 @@ export default function CombinedSecuritySettings({showPageHeader=false}:{showPag
       {([["America/Los_Angeles","Pacific (Los Angeles)"],["America/Denver","Mountain (Denver)"],["America/Phoenix","Arizona (Phoenix)"],["America/Chicago","Central (Chicago)"],["America/New_York","Eastern (New York)"],["America/Anchorage","Alaska"],["Pacific/Honolulu","Hawaii"],["America/Toronto","Toronto"],["Europe/London","London"],["Europe/Paris","Central Europe"],["Asia/Kolkata","India"],["Asia/Tokyo","Tokyo"],["Australia/Sydney","Sydney"],["UTC","UTC"]] as string[][]).map(([id,label])=><option key={id} value={id}>{label}</option>)}
      </select>
     </div>
-    <div className="subtitle" style={{marginTop:8}}>Email uses the same <strong>{criteria.incident_threshold}/100</strong> threshold as incident creation. Manual sync/import behavior is unchanged.</div>
    </div>
   </div>
 
