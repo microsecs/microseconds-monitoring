@@ -1,18 +1,25 @@
 "use client";
 import {useEffect,useState} from "react";
-const empty={enabled:true,alert_emails:[] as string[],alert_successful_suspicious:true,min_risk_score:50,immediate_critical:true,hourly_digest_review:true};
+const empty={enabled:true,alert_emails:[] as string[],alert_successful_suspicious:true,min_risk_score:50,immediate_critical:true,hourly_digest_review:true,recipient_time_zones:{} as Record<string,string>};
 export default function NotificationSettings(){
  const [s,setS]=useState<any>(empty),[msg,setMsg]=useState(""),[err,setErr]=useState(""),[saving,setSaving]=useState(false);
- const set=(k:string,v:any)=>setS((x:any)=>({...x,[k]:v}));
+ const timeZoneOptions=[
+ ["America/Los_Angeles","Pacific (Los Angeles)"],["America/Denver","Mountain (Denver)"],["America/Phoenix","Arizona (Phoenix)"],["America/Chicago","Central (Chicago)"],["America/New_York","Eastern (New York)"],["America/Anchorage","Alaska"],["Pacific/Honolulu","Hawaii"],["America/Toronto","Toronto"],["Europe/London","London"],["Europe/Paris","Central Europe"],["Asia/Kolkata","India"],["Asia/Tokyo","Tokyo"],["Australia/Sydney","Sydney"],["UTC","UTC"]
+];
+const browserZone=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||"America/Los_Angeles"}catch{return "America/Los_Angeles"}};
+const set=(k:string,v:any)=>setS((x:any)=>({...x,[k]:v}));
  useEffect(()=>{fetch("/api/notifications",{cache:"no-store"}).then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error);setS({...empty,...j.settings})}).catch(e=>setErr(e.message));},[]);
- async function save(){setSaving(true);setMsg("");setErr("");try{const r=await fetch("/api/notifications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:s.enabled,alertEmails:s.alert_emails.join("\n"),alertSuccessfulSuspicious:s.alert_successful_suspicious,minRiskScore:s.min_risk_score,immediateCritical:s.immediate_critical,hourlyDigestReview:s.hourly_digest_review})});const j=await r.json();if(!r.ok)throw new Error(j.error);setS({...empty,...j.settings});setMsg("Notification settings saved for all tenants.");}catch(e:any){setErr(e.message)}finally{setSaving(false)}}
+ async function save(){setSaving(true);setMsg("");setErr("");try{const r=await fetch("/api/notifications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:s.enabled,alertEmails:s.alert_emails.join("\n"),alertSuccessfulSuspicious:s.alert_successful_suspicious,minRiskScore:s.min_risk_score,immediateCritical:s.immediate_critical,hourlyDigestReview:s.hourly_digest_review,recipientTimeZones:s.recipient_time_zones})});const j=await r.json();if(!r.ok)throw new Error(j.error);setS({...empty,...j.settings});setMsg("Notification settings saved for all tenants.");}catch(e:any){setErr(e.message)}finally{setSaving(false)}}
  return <div className="card" id="notifications">
   <h2 style={{marginTop:0}}>Notifications</h2>
   <p className="muted">One notification policy applies to every Microsoft 365 and Google Workspace tenant.</p>
   {err?<div className="errorBox">{err}</div>:null}{msg?<div className="infoBox">{msg}</div>:null}
   <label style={{display:"flex",gap:10,alignItems:"center",marginTop:16}}><input type="checkbox" checked={!!s.enabled} onChange={e=>set("enabled",e.target.checked)}/><strong>Enable email security notifications</strong></label>
   <div style={{opacity:s.enabled?1:.5,pointerEvents:s.enabled?"auto":"none"}}>
-   <div style={{marginTop:18}}><label className="subtitle">Send alerts to</label><textarea className="select" rows={4} value={(s.alert_emails||[]).join("\n")} onChange={e=>set("alert_emails",e.target.value.split(/\n/).map(x=>x.trim()).filter(Boolean))} placeholder={"security@example.com\nadmin@example.com"} style={{width:"100%",marginTop:6}}/></div>
+   <div style={{marginTop:18}}><label className="subtitle">Send alerts to</label><textarea className="select" rows={4} value={(s.alert_emails||[]).join("\n")} onChange={e=>{const emails=e.target.value.split(/\n/).map(x=>x.trim().toLowerCase()).filter(Boolean);setS((prev:any)=>{const zones={...prev.recipient_time_zones};for(const email of emails)if(!zones[email]&&!((prev.alert_emails||[]).includes(email)))zones[email]=browserZone();return {...prev,alert_emails:emails,recipient_time_zones:zones};});}} placeholder={"security@example.com\nadmin@example.com"} style={{width:"100%",marginTop:6}}/></div>
+   <div style={{marginTop:16}}><label className="subtitle"><strong>Recipient timezones</strong></label><div className="muted" style={{marginTop:4}}>Choose the timezone used for sign-in times in each recipient’s emails. Daylight saving time adjusts automatically. New recipients default to your browser timezone; existing recipients default to Pacific Time until changed.</div>
+   {(s.alert_emails||[]).map((email:string)=>{const zone=s.recipient_time_zones?.[email]||"America/Los_Angeles";return <div key={email} style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:10,marginTop:10}}><span style={{minWidth:200,overflowWrap:"anywhere",flex:"1 1 200px"}}>{email}</span><select className="select" aria-label={`Timezone for ${email}`} value={zone} style={{flex:"1 1 230px"}} onChange={e=>set("recipient_time_zones",{...s.recipient_time_zones,[email]:e.target.value})}>{!timeZoneOptions.some(x=>x[0]===zone)?<option value={zone}>{zone}</option>:null}{timeZoneOptions.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div>})}
+   </div>
    <label style={{display:"block",marginTop:16}}><input type="checkbox" checked={s.alert_successful_suspicious!==false} onChange={e=>set("alert_successful_suspicious",e.target.checked)}/> Alert on suspicious successful sign-ins</label>
    <div style={{marginTop:18}}>
     <label className="subtitle"><strong>Email notification threshold</strong></label>

@@ -13,8 +13,10 @@ export async function POST(req:Request){
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)||to.length>254)return NextResponse.json({error:"Enter a valid recipient email"},{status:400});
   if(!["single","multiple","critical"].includes(type))return NextResponse.json({error:"Invalid sample type"},{status:400});
   if(!smtpConfigured())return NextResponse.json({error:"SMTP is not configured"},{status:503});
+  const timeZone=String(body?.timeZone||"America/Los_Angeles");
+  try{new Intl.DateTimeFormat("en-US",{timeZone});}catch{return NextResponse.json({error:"Invalid timezone"},{status:400});}
   const candidates=sampleAlertCandidates(type as "single"|"multiple"|"critical");
-  const html=renderSecurityAlertEmail(candidates,new Map(),true);
+  const html=renderSecurityAlertEmail(candidates,new Map(),true,timeZone);
   const from=process.env.SECURITY_ALERT_FROM||"MicroSECONDS Monitoring <monitoring@microseconds.com>";
   await sendSmtpMail({from,to,subject:`[TEST] MicroSECONDS Security Notification — ${type}`,html});
   return NextResponse.json({ok:true});

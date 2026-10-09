@@ -20,10 +20,10 @@ function badge(sev:any){
 }
 // Emails are rendered on the server, so the recipient's device timezone is unavailable.
 // Use an explicitly configured display timezone (Pacific by default), with its abbreviation.
-function alertTime(v:any){
+function alertTime(v:any, recipientTimeZone?:string){
  const d=new Date(String(v||""));
  if(Number.isNaN(d.getTime()))return String(v||"Unknown");
- const configured=process.env.SECURITY_ALERT_TIME_ZONE||"America/Los_Angeles";
+ const configured=recipientTimeZone||process.env.SECURITY_ALERT_TIME_ZONE||"America/Los_Angeles";
  let timeZone=configured;
  try { new Intl.DateTimeFormat("en-US",{timeZone}).format(d); } catch {timeZone="America/Los_Angeles";}
  return d.toLocaleString("en-US",{timeZone,year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",second:"2-digit",timeZoneName:"short"});
@@ -40,6 +40,9 @@ export async function sendConsolidatedIncidentAlert(params:{organizationId:strin
  if(!recipients.length){ console.warn(`[alerts] ${params.organizationId}: no alert recipients configured`); return {sent:0,incidentsAlerted:0,reason:"no_recipients"}; }
  if(!candidates.length){ console.log(`[alerts] ${params.organizationId}: no eligible incidents`); return {sent:0,incidentsAlerted:0,reason:"no_candidates"}; }
  console.log(`[alerts] ${params.organizationId}: preparing ${candidates.length} incident(s) for ${recipients.length} recipient(s)`);
+ const {data:notificationRow,error:zoneError}=await db.from("organization_notification_settings").select("recipient_time_zones").eq("organization_id",params.organizationId).maybeSingle();
+ if(zoneError)console.warn("[alerts] Could not load recipient timezones:",zoneError.message);
+ const recipientZones:Record<string,string>=notificationRow?.recipient_time_zones||{};
  const from=process.env.SECURITY_ALERT_FROM||"MicroSECONDS Monitoring <monitoring@microseconds.com>";
  let sent=0,incidentsAlerted=0;
 
@@ -61,7 +64,7 @@ export async function sendConsolidatedIncidentAlert(params:{organizationId:strin
   const pending=candidates.filter(x=>!done.has(String(x.incident.id)));
   if(!pending.length){ console.log(`[alerts] ${params.organizationId}: ${recipient} has no pending incidents`); continue; }
 
-  const html=renderSecurityAlertEmail(pending, alertIntelByIp);
+  const html=renderSecurityAlertEmail(pending, alertIntelByIp, false, recipientZones[recipient]);
   const count=pending.length;
   const subject=`Security Alert: ${count} Incident${count===1?"":"s"}`;
   console.log(`[alerts] ${params.organizationId}: sending ${pending.length} incident(s) to ${recipient} via SMTP`);
@@ -89,7 +92,7 @@ export async function sendConsolidatedIncidentAlert(params:{organizationId:strin
 }
 
 /** One shared email template for scheduled alerts and Product Admin samples. */
-export function renderSecurityAlertEmail(candidates:AlertCandidate[], intelByIp:Map<string,any>=new Map(), test=false){
+export function renderSecurityAlertEmail(candidates:AlertCandidate[], intelByIp:Map<string,any>=new Map(), test=false, recipientTimeZone?:string){
  const critical=candidates.filter(x=>String(x.incident?.severity).toLowerCase()==="critical").length;
  const suspicious=candidates.filter(x=>["suspicious","high"].includes(String(x.incident?.severity).toLowerCase())).length;
  const review=candidates.length-critical-suspicious;
@@ -116,7 +119,7 @@ export function renderSecurityAlertEmail(candidates:AlertCandidate[], intelByIp:
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr><td style="font-size:15px;font-weight:bold;color:#172033">${escapeHtml(user)}</td><td align="right" style="font-size:12px;font-weight:bold;color:${color}">${escapeHtml(severity)} · ${escapeHtml(inc.risk_score??"?")}/100</td></tr></table>
     ${email&&email.toLowerCase()!==user.toLowerCase()?`<div style="font-size:13px;color:#334155;margin-top:5px;word-break:break-word">${escapeHtml(email).replace("@","&#8288;@&#8288;")}</div>`:""}
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:9px;width:100%">
-    ${line("Location",location)}${line("IP address",String(si.ip_address||"Unavailable"))}${line("Sign-in time",alertTime(si.event_time))}${line("Risk factors",reasons)}
+    ${line("Location",location)}${line("IP address",String(si.ip_address||"Unavailable"))}${line("Sign-in time",alertTime(si.event_time,recipientTimeZone))}${line("Risk factors",reasons)}
     </table></td></tr>`;
   }).join("");
   return `<tr><td style="padding:20px 24px 0"><div style="font-size:15px;font-weight:bold;color:#172033">${escapeHtml(first.tenantName||"Unknown tenant")}</div><div style="font-size:12px;color:#64748b;margin-top:3px">${escapeHtml(platform)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${events}</table></td></tr>`;
