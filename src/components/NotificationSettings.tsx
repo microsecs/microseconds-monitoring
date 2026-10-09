@@ -15,10 +15,7 @@ const set=(k:string,v:any)=>setS((x:any)=>({...x,[k]:v}));
   {err?<div className="errorBox">{err}</div>:null}{msg?<div className="infoBox">{msg}</div>:null}
   <label style={{display:"flex",gap:10,alignItems:"center",marginTop:16}}><input type="checkbox" checked={!!s.enabled} onChange={e=>set("enabled",e.target.checked)}/><strong>Enable email security notifications</strong></label>
   <div style={{opacity:s.enabled?1:.5,pointerEvents:s.enabled?"auto":"none"}}>
-   <div style={{marginTop:18}}><label className="subtitle">Send alerts to</label><textarea className="select" rows={4} value={(s.alert_emails||[]).join("
-")} onChange={e=>set("alert_emails",e.target.value.split(/
-/).map(x=>x.trim().toLowerCase()).filter(Boolean))} placeholder={"security@example.com
-admin@example.com"} style={{width:"100%",marginTop:6}}/></div>
+   <div style={{marginTop:18}}><label className="subtitle">Send alerts to</label><textarea className="select" rows={4} value={(s.alert_emails||[]).join("\n")} onChange={e=>set("alert_emails",e.target.value.split(/\n/).map(x=>x.trim().toLowerCase()).filter(Boolean))} placeholder={"security@example.com\nadmin@example.com"} style={{width:"100%",marginTop:6}}/></div>
    <div style={{marginTop:16}}><label className="subtitle"><strong>Notification timezone</strong></label><div className="muted" style={{marginTop:4}}>All notification recipients for this customer see sign-in times in this timezone. Daylight saving time adjusts automatically.</div><select className="select" aria-label="Notification timezone" value={s.notification_time_zone||"America/Los_Angeles"} onChange={e=>set("notification_time_zone",e.target.value)} style={{width:"100%",marginTop:8}}>{!timeZoneOptions.some(x=>x[0]===s.notification_time_zone)?<option value={s.notification_time_zone}>{s.notification_time_zone}</option>:null}{timeZoneOptions.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div>
    <label style={{display:"block",marginTop:16}}><input type="checkbox" checked={s.alert_successful_suspicious!==false} onChange={e=>set("alert_successful_suspicious",e.target.checked)}/> Alert on suspicious successful sign-ins</label>
    <div style={{marginTop:18}}>
