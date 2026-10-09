@@ -14,11 +14,9 @@ export async function POST(req:NextRequest){
  try{
   const b=await req.json(),org=await requireWritableOrganization();
   const emails=parseEmails(b?.alertEmails);
-  const raw=b?.recipientTimeZones;
-  if(raw!==undefined&&(typeof raw!=="object"||raw===null||Array.isArray(raw)))return NextResponse.json({error:"Invalid timezone preferences"},{status:400});
-  const zones:Record<string,string>={};
-  for(const email of emails){const zone=raw?.[email];if(zone!==undefined){if(!validTimeZone(zone))return NextResponse.json({error:`Invalid timezone for ${email}`},{status:400});zones[email]=zone;}}
-  const row={organization_id:org.id,enabled:b?.enabled!==false,alert_emails:emails,recipient_time_zones:zones,
+  const timeZone=b?.notificationTimeZone??"America/Los_Angeles";
+  if(!validTimeZone(timeZone))return NextResponse.json({error:"Invalid notification timezone"},{status:400});
+  const row={organization_id:org.id,enabled:b?.enabled!==false,alert_emails:emails,notification_time_zone:timeZone,
    alert_successful_suspicious:b?.alertSuccessfulSuspicious!==false,alert_failed_suspicious:false,
    min_risk_score:Math.max(0,Math.min(100,Number(b?.minRiskScore??50))),
    immediate_critical:b?.immediateCritical!==false,hourly_digest_review:b?.hourlyDigestReview!==false,

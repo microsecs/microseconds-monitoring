@@ -40,9 +40,9 @@ export async function sendConsolidatedIncidentAlert(params:{organizationId:strin
  if(!recipients.length){ console.warn(`[alerts] ${params.organizationId}: no alert recipients configured`); return {sent:0,incidentsAlerted:0,reason:"no_recipients"}; }
  if(!candidates.length){ console.log(`[alerts] ${params.organizationId}: no eligible incidents`); return {sent:0,incidentsAlerted:0,reason:"no_candidates"}; }
  console.log(`[alerts] ${params.organizationId}: preparing ${candidates.length} incident(s) for ${recipients.length} recipient(s)`);
- const {data:notificationRow,error:zoneError}=await db.from("organization_notification_settings").select("recipient_time_zones").eq("organization_id",params.organizationId).maybeSingle();
- if(zoneError)console.warn("[alerts] Could not load recipient timezones:",zoneError.message);
- const recipientZones:Record<string,string>=notificationRow?.recipient_time_zones||{};
+ const {data:notificationRow,error:zoneError}=await db.from("organization_notification_settings").select("notification_time_zone").eq("organization_id",params.organizationId).maybeSingle();
+ if(zoneError)console.warn("[alerts] Could not load notification timezone:",zoneError.message);
+ const notificationTimeZone:string=notificationRow?.notification_time_zone||"America/Los_Angeles";
  const from=process.env.SECURITY_ALERT_FROM||"MicroSECONDS Monitoring <monitoring@microseconds.com>";
  let sent=0,incidentsAlerted=0;
 
@@ -64,7 +64,7 @@ export async function sendConsolidatedIncidentAlert(params:{organizationId:strin
   const pending=candidates.filter(x=>!done.has(String(x.incident.id)));
   if(!pending.length){ console.log(`[alerts] ${params.organizationId}: ${recipient} has no pending incidents`); continue; }
 
-  const html=renderSecurityAlertEmail(pending, alertIntelByIp, false, recipientZones[recipient]);
+  const html=renderSecurityAlertEmail(pending, alertIntelByIp, false, notificationTimeZone);
   const count=pending.length;
   const subject=`Security Alert: ${count} Incident${count===1?"":"s"}`;
   console.log(`[alerts] ${params.organizationId}: sending ${pending.length} incident(s) to ${recipient} via SMTP`);
