@@ -29,10 +29,10 @@ export default function BulkIncidentActions({ids}:{ids:string[]}){
   <div className="card" style={{marginBottom:14}}>
    <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
     <label style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer"}}><input type="checkbox" checked={ids.length>0&&chosen.length===ids.length} disabled={!!busy||!ids.length} onChange={e=>setSelected(e.target.checked?[...ids]:[])}/> Select all on this page</label>
-    <span aria-hidden="true" style={{height:26,borderLeft:"1px solid color-mix(in srgb, var(--border, #cbd5e1) 45%, transparent)",margin:"0 2px"}}/>
+    <span aria-hidden="true" style={{height:26,borderLeft:"1px solid var(--line)",margin:"0 2px"}}/>
     <span className="subtitle">{chosen.length} selected</span>
     <button className="button" disabled={!chosen.length||!!busy} onClick={()=>setSelected([])}>Clear Selection</button>
-    <span aria-hidden="true" style={{height:26,borderLeft:"1px solid color-mix(in srgb, var(--border, #cbd5e1) 45%, transparent)",margin:"0 2px"}}/>
+    <span aria-hidden="true" style={{height:26,borderLeft:"1px solid var(--line)",margin:"0 2px"}}/>
     {(["marked_safe","dismissed","confirmed_suspicious"] as Action[]).map(action=><button key={action} className="button" style={{background:action==="marked_safe"?"#15803d":action==="dismissed"?"#1d4ed8":"#b91c1c",color:"#fff",borderColor:"transparent"}} disabled={!chosen.length||!!busy} onClick={()=>apply(action)}>{labels[action]}</button>)}
    </div>
    {error?<div className="errorBox" style={{marginTop:10}}>{error}</div>:null}
