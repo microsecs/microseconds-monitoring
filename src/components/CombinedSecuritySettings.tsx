@@ -47,7 +47,8 @@ export default function CombinedSecuritySettings({showPageHeader=false}:{showPag
      enabled:notify.enabled,alertEmails:(notify.alert_emails||[]).join("\n"),
      alertSuccessfulSuspicious:notify.alert_successful_suspicious,
      minRiskScore:criteria.incident_threshold,
-     immediateCritical:notify.immediate_critical,hourlyDigestReview:notify.hourly_digest_review
+     immediateCritical:notify.immediate_critical,hourlyDigestReview:notify.hourly_digest_review,
+     notificationTimeZone:notify.notification_time_zone||"America/Los_Angeles"
     })}),
     fetch("/api/settings/automatic-monitoring",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:monitoring})})
    ]);
@@ -112,6 +113,13 @@ export default function CombinedSecuritySettings({showPageHeader=false}:{showPag
    <div style={{opacity:notify.enabled&&notify.alert_successful_suspicious!==false?1:.5,pointerEvents:notify.enabled&&notify.alert_successful_suspicious!==false?"auto":"none",marginTop:18}}>
     <label className="subtitle">Alert recipients</label>
     <textarea className="select" rows={3} value={(notify.alert_emails||[]).join("\n")} onChange={e=>n("alert_emails",e.target.value.split(/\n/).map(x=>x.trim()).filter(Boolean))} placeholder={"security@example.com\nadmin@example.com"} style={{width:"100%",marginTop:6}}/>
+    <div style={{marginTop:16}}>
+     <label className="subtitle" htmlFor="notification-timezone"><strong>Notification timezone</strong></label>
+     <div className="subtitle" style={{marginTop:5}}>All alert recipients receive sign-in times in this timezone. Daylight saving time adjusts automatically.</div>
+     <select id="notification-timezone" className="select" value={notify.notification_time_zone||"America/Los_Angeles"} onChange={e=>n("notification_time_zone",e.target.value)} style={{width:"100%",marginTop:8}}>
+      {([["America/Los_Angeles","Pacific (Los Angeles)"],["America/Denver","Mountain (Denver)"],["America/Phoenix","Arizona (Phoenix)"],["America/Chicago","Central (Chicago)"],["America/New_York","Eastern (New York)"],["America/Anchorage","Alaska"],["Pacific/Honolulu","Hawaii"],["America/Toronto","Toronto"],["Europe/London","London"],["Europe/Paris","Central Europe"],["Asia/Kolkata","India"],["Asia/Tokyo","Tokyo"],["Australia/Sydney","Sydney"],["UTC","UTC"]] as string[][]).map(([id,label])=><option key={id} value={id}>{label}</option>)}
+     </select>
+    </div>
     <div className="subtitle" style={{marginTop:8}}>Email uses the same <strong>{criteria.incident_threshold}/100</strong> threshold as incident creation. Manual sync/import behavior is unchanged.</div>
    </div>
   </div>
