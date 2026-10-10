@@ -1,3 +1,4 @@
+import { assertTenantCapacity } from "@/lib/tenantLimit";
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeGoogleCode, googleLoginSample, googleDirectoryUsers, encryptGoogleSecret } from "@/lib/googleWorkspace";
 import { getSupabaseAdmin, requireWritableOrganization } from "@/lib/supabaseAdmin";
@@ -67,6 +68,7 @@ export async function GET(req: NextRequest) {
       if (updated.error) throw updated.error;
       googleTenantId = updated.data.id;
     } else {
+      await assertTenantCapacity(org.id);
       const inserted = await supabase
         .from("google_workspace_tenants")
         .insert(row)

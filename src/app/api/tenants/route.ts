@@ -1,3 +1,4 @@
+import { getTenantUsage, assertTenantCapacity } from "@/lib/tenantLimit";
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { getOrCreateDevOrganization, requireWritableOrganization, getSupabaseAdmin, withSupabaseClockSkewRetry } from "@/lib/supabaseAdmin";
@@ -35,7 +36,9 @@ export async function GET() {
     const ids = tenants.map((t:any)=>t.id);
     const { data: locks } = ids.length ? await supabase.from("tenant_sync_locks").select("tenant_id,expires_at").eq("organization_id",org.id).eq("provider","microsoft").in("tenant_id",ids).gt("expires_at",new Date().toISOString()) : { data: [] as any[] };
     const syncing = new Set((locks || []).map((x:any)=>x.tenant_id));
+    const usage = await getTenantUsage(org.id);
     return NextResponse.json({
+      tenantUsage: usage,
       organization: { id: org.id, name: org.name },
       tenants: tenants.map((t: any) => ({
         ...t,
@@ -71,6 +74,7 @@ export async function POST(req: NextRequest) {
       suppliedTenantId ||
       `manual:${crypto.randomUUID()}`;
 
+    await assertTenantCapacity(org.id);
     const { data, error } = await supabase
       .from("microsoft_tenants")
       .insert({

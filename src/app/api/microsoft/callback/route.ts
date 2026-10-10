@@ -1,3 +1,4 @@
+import { assertTenantCapacity } from "@/lib/tenantLimit";
 import { NextRequest, NextResponse } from "next/server";
 import { domainFromMicrosoftSignIns, isGeneratedMicrosoftName } from "@/lib/microsoftTenantName";
 import {
@@ -166,6 +167,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
   } else {
+    await assertTenantCapacity(org.id);
     const { data: created, error: insertError } = await supabase
       .from("microsoft_tenants")
       .insert({

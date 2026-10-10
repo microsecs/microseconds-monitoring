@@ -56,6 +56,7 @@ function healthBadge(status?: string | null, error?: string | null) {
 
 export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [tenantLimit, setTenantLimit] = useState(50);
   const [googleTenants, setGoogleTenants] = useState<GoogleTenant[]>([]);
   const [googleSyncingId, setGoogleSyncingId] = useState("");
   const [googleNameEdits, setGoogleNameEdits] = useState<Record<string, string>>({});
@@ -86,6 +87,7 @@ export default function TenantsPage() {
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || "Could not load tenants.");
 
+    setTenantLimit(data.tenantUsage?.limit ?? 50);
     const list: Tenant[] = data.tenants || [];
     setTenants(list);
     setOrganization(data.organization?.name || "");
@@ -518,7 +520,7 @@ export default function TenantsPage() {
             >
               Sync All
             </button>
-            <button className="button primary" onClick={() => setShowAddTenant((v) => !v)}>
+            <button className="button primary" disabled={totalTenants >= tenantLimit && !showAddTenant} onClick={() => setShowAddTenant((v) => !v)}>
               {showAddTenant ? "Close Add Tenant" : "Add Tenant"}
             </button>
           </div>
@@ -542,7 +544,7 @@ export default function TenantsPage() {
 
       <div className="tenantSummary" aria-label="Tenant monitoring summary">
         <div className="tenantMetric">
-          <div className="tenantMetricValue">{totalTenants}</div>
+          <div className="tenantMetricValue">{totalTenants} <span style={{fontSize:15,color:"var(--muted)",fontWeight:500}}>/ {tenantLimit}</span></div>
           <div className="tenantMetricLabel">Total Tenants</div>
           <div className="tenantMetricHint">Microsoft 365 + Google Workspace</div>
         </div>
@@ -562,6 +564,8 @@ export default function TenantsPage() {
           <div className="tenantMetricHint">Connection or reconnection issue</div>
         </div>
       </div>
+
+      {totalTenants >= tenantLimit ? <div className="infoBox" style={{marginBottom:12}}>Tenant limit reached ({tenantLimit}). Delete an existing tenant before connecting another. Existing tenants can still be reconnected.</div> : null}
 
       {showAddTenant ? (
         <div className="card" style={{ marginBottom: 18 }}>
