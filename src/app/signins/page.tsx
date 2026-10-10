@@ -104,7 +104,7 @@ export default async function SigninsPage({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent:"flex-end", flexWrap: "wrap", marginLeft:"auto", maxWidth:"calc(100% - 260px)" }}>
           <div style={{display:"flex",gap:6,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>
           <form method="get" style={{display:"flex",gap:6,alignItems:"center"}}>
             {Object.entries(rangeQuery).map(([k,v])=><input key={k} type="hidden" name={k} value={v}/>)}
@@ -137,7 +137,7 @@ export default async function SigninsPage({
             {search ? <input type="hidden" name="q" value={search} /> : null}
             {!showUnsuccessful ? <input type="hidden" name="unsuccessful" value="1" /> : null}
             <button type="submit" className="button">
-              {showUnsuccessful ? "Hide Unsuccessful Logins" : "Show Unsuccessful Logins"}
+              {showUnsuccessful ? "Hide Unsuccessful" : "Show Unsuccessful"}
             </button>
           </form>
           </div>
@@ -145,7 +145,7 @@ export default async function SigninsPage({
             <div style={{paddingRight:12,borderRight:"1px solid var(--line)"}}>
               <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{tenant:rawTenant,platform:selectedPlatform,unsuccessful:showUnsuccessful?"1":"",q:search}}/>
             </div>
-            <a className="button" href={`/api/exports/signins?${new URLSearchParams({...params,page:""}).toString()}`}>Export CSV</a>
+            <a className="button" style={{fontSize:14,fontFamily:"inherit",fontWeight:600,padding:"9px 12px",whiteSpace:"nowrap"}} href={`/api/exports/signins?${new URLSearchParams({...params,page:""}).toString()}`}>Export CSV</a>
           </div>
         </div>
       </div>

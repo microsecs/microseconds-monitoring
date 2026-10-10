@@ -47,7 +47,7 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
  return <>
   <IncidentStatusPopup />
   <div className="topbar"><div><div className="title">Security Incidents</div><div className="subtitle">Microsoft 365 and Google Workspace sign-ins that deserve attention</div></div>
-   <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+   <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",justifyContent:"flex-end",marginLeft:"auto",maxWidth:"calc(100% - 300px)"}}>
     <div style={{display:"flex",gap:6,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>
      <form method="get" style={{display:"flex",gap:6,alignItems:"center"}}>
       {(["range","from","to"] as const).map(k=>params[k]?<input key={k} type="hidden" name={k} value={params[k]}/>:null)}
@@ -64,7 +64,7 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
      <div style={{paddingRight:12,borderRight:"1px solid var(--line)"}}>
       <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{dismissed:includeDismissed?"1":"",q:search}}/>
      </div>
-     <a className="button" href={`/api/exports/incidents?${new URLSearchParams({...params,page:""}).toString()}`}>Export CSV</a>
+     <a className="button" style={{fontSize:14,fontFamily:"inherit",fontWeight:600,padding:"9px 12px",whiteSpace:"nowrap"}} href={`/api/exports/incidents?${new URLSearchParams({...params,page:""}).toString()}`}>Export CSV</a>
     </div>
    </div>
   </div>

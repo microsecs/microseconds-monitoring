@@ -248,3 +248,9 @@ body{min-height:100vh}
 .learningFilters button{cursor:pointer}
 .learningTable{min-width:1180px}.learningTable td{vertical-align:top}.learningUser{overflow-wrap:anywhere;max-width:220px}
 .learningPages{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px;color:var(--muted);font-size:13px}.learningPages>div{display:flex;gap:10px}
+
+/* Keep report controls right-aligned; show custom dates directly beneath them. */
+.topbar:has(.customDateFields){margin-bottom:82px}
+.topbar .button{font-size:14px;font-family:inherit;white-space:nowrap}
+@media(max-width:1050px){.topbar{align-items:flex-start;gap:12px}.topbar>div:last-child{max-width:75%!important}}
+@media(max-width:700px){.topbar{flex-direction:column}.topbar>div:last-child{max-width:100%!important;width:100%;justify-content:flex-end!important}.topbar:has(.customDateFields){margin-bottom:100px}}
