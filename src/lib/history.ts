@@ -79,7 +79,7 @@ export async function getTenants() {
 
 export async function getRecentHistoryPage(opts:{
   page?:number; pageSize?:number; microsoftTenantId?:string; googleTenantId?:string;
-  platform?:string; includeUnsuccessful?:boolean; search?:string; range?:string; from?:string; to?:string;
+  platform?:string; includeUnsuccessful?:boolean; search?:string; range?:string; from?:string; to?:string; tz?:string;
 }): Promise<{rows:HistoryRow[];total:number;page:number;pageSize:number}> {
   const page=Math.max(1,opts.page||1),pageSize=Math.min(250,Math.max(25,opts.pageSize||100));
   const microsoftTenantId=opts.microsoftTenantId,googleTenantId=opts.googleTenantId,platform=opts.platform;

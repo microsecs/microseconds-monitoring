@@ -1,3 +1,4 @@
+import BrowserTimeZoneSync from "@/components/BrowserTimeZoneSync";
 import ExportCsvButton from "@/components/ExportCsvButton";
 import HistoryDateFilter from "@/components/HistoryDateFilter";
 import { getRecentHistoryPage, getTenants, getGoogleTenants } from "@/lib/history";
@@ -53,10 +54,10 @@ function locationLabel(r: any) {
 export default async function SigninsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tenant?: string; googleTenant?: string; platform?: string; unsuccessful?: string; page?: string; q?: string; range?:string;from?:string;to?:string }>;
+  searchParams?: Promise<{ tenant?: string; googleTenant?: string; platform?: string; unsuccessful?: string; page?: string; q?: string; range?:string;from?:string;to?:string;tz?:string }>;
 }) {
   const params = (await searchParams) || {};
-  const rangeQuery={...(params.range?{range:params.range}:{}),...(params.from?{from:params.from}:{}),...(params.to?{to:params.to}:{})};
+  const rangeQuery={...(params.tz?{tz:params.tz}:{}),...(params.range?{range:params.range}:{}),...(params.from?{from:params.from}:{}),...(params.to?{to:params.to}:{})};
   const rawTenant = params.tenant || "";
   const selectedGoogleTenant = params.googleTenant || (rawTenant.startsWith("google:") ? rawTenant.slice(7) : "");
   const selectedTenant = rawTenant.startsWith("google:") ? "" : rawTenant;
@@ -80,7 +81,7 @@ export default async function SigninsPage({
         googleTenantId:selectedGoogleTenant || undefined,
         platform:selectedPlatform || undefined,
         includeUnsuccessful:showUnsuccessful,
-        search:search || undefined,range:params.range,from:params.from,to:params.to
+        search:search || undefined,range:params.range,from:params.from,to:params.to,tz:params.tz
       }),
       getTenants(),
       getGoogleTenants(),
@@ -97,6 +98,7 @@ export default async function SigninsPage({
 
   return (
     <>
+      <BrowserTimeZoneSync />
       <div className="topbar">
         <div>
           <div className="title">Sign-in History</div>
@@ -118,7 +120,7 @@ export default async function SigninsPage({
           </form>
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>            <div>
-              <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{tenant:rawTenant,platform:selectedPlatform,unsuccessful:showUnsuccessful?"1":"",q:search}}/>
+              <HistoryDateFilter range={params.range} from={params.from} to={params.to} tz={params.tz} preserve={{tenant:rawTenant,platform:selectedPlatform,unsuccessful:showUnsuccessful?"1":"",q:search}}/>
             </div>
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"nowrap",paddingRight:12,borderRight:"1px solid var(--line)"}}>
@@ -127,7 +129,7 @@ export default async function SigninsPage({
             microsoftTenants={tenants.map((t: any) => ({ id: t.id, label: t.tenant_name || t.tenant_id }))}
             googleTenants={googleTenants.map((t: any) => ({ id: t.id, label: t.display_name || t.primary_domain || "Google Workspace" }))}
             platform={selectedPlatform}
-            range={params.range} from={params.from} to={params.to}
+            range={params.range} from={params.from} to={params.to} tz={params.tz}
             showUnsuccessful={showUnsuccessful}
           />
 

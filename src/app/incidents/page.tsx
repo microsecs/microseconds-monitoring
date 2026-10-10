@@ -1,3 +1,4 @@
+import BrowserTimeZoneSync from "@/components/BrowserTimeZoneSync";
 import ExportCsvButton from "@/components/ExportCsvButton";
 import HistoryDateFilter from "@/components/HistoryDateFilter";
 import IncidentActions from "./IncidentActions";
@@ -35,17 +36,18 @@ function privacyLabel(intel:any){
  if(intel.privacy_available===true)return "None detected";
  return "Unknown";
 }
-function href(params:any,page:number){const p=new URLSearchParams();if(params.dismissed==="1")p.set("dismissed","1");if(params.q)p.set("q",params.q);for(const k of ["range","from","to"])if(params[k])p.set(k,params[k]);p.set("page",String(page));return `/incidents?${p.toString()}`;}
-export default async function IncidentsPage({searchParams}:{searchParams:Promise<{dismissed?:string;page?:string;q?:string;range?:string;from?:string;to?:string}>}){
+function href(params:any,page:number){const p=new URLSearchParams();if(params.dismissed==="1")p.set("dismissed","1");if(params.q)p.set("q",params.q);for(const k of ["range","from","to","tz"])if(params[k])p.set(k,params[k]);p.set("page",String(page));return `/incidents?${p.toString()}`;}
+export default async function IncidentsPage({searchParams}:{searchParams:Promise<{dismissed?:string;page?:string;q?:string;range?:string;from?:string;to?:string;tz?:string}>}){
  const params=await searchParams,includeDismissed=params.dismissed==="1",search=(params.q||"").trim();
  const page=Math.max(1,Number(params.page||"1")||1),pageSize=100;
- const result=await getIncidentQueuePage({page,pageSize,includeDismissed,includeFailed:false,search:search||undefined,range:params.range,from:params.from,to:params.to});
+ const result=await getIncidentQueuePage({page,pageSize,includeDismissed,includeFailed:false,search:search||undefined,range:params.range,from:params.from,to:params.to,tz:params.tz});
  const rows=result.rows,total=result.total,totalPages=Math.max(1,Math.ceil(total/pageSize));
  const first=rows.length?(page-1)*pageSize+1:0,last=rows.length?first+rows.length-1:0;
  const active=rows.filter((x:any)=>x.status!=="dismissed");
  const critical=active.filter((x:any)=>x.severity==="critical");
  const suspicious=active.filter((x:any)=>x.severity==="suspicious");
  return <>
+  <BrowserTimeZoneSync />
   <IncidentStatusPopup />
   <div className="topbar"><div><div className="title">Security Incidents</div><div className="subtitle">Microsoft 365 and Google Workspace sign-ins that deserve attention</div></div>
    <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",justifyContent:"flex-end",marginLeft:"auto",maxWidth:"calc(100% - 300px)"}}>
@@ -59,7 +61,7 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
      </form>
     </div>
     <div style={{display:"flex",gap:8,alignItems:"center"}}>     <div>
-       <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{dismissed:includeDismissed?"1":"",q:search}}/>
+       <HistoryDateFilter range={params.range} from={params.from} to={params.to} tz={params.tz} preserve={{dismissed:includeDismissed?"1":"",q:search}}/>
      </div>
     </div>
     <div style={{display:"flex",gap:8,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>

@@ -1,6 +1,6 @@
 "use client";
 type Opt={id:string;label:string};
-export default function TenantSignInFilter({value,microsoftTenants,googleTenants,platform,showUnsuccessful,range,from,to}:{value:string;microsoftTenants:Opt[];googleTenants:Opt[];platform?:string;showUnsuccessful:boolean;range?:string;from?:string;to?:string;}){
+export default function TenantSignInFilter({value,microsoftTenants,googleTenants,platform,showUnsuccessful,range,from,to,tz}:{value:string;microsoftTenants:Opt[];googleTenants:Opt[];platform?:string;showUnsuccessful:boolean;range?:string;from?:string;to?:string;tz?:string;}){
  const allTenants=[...microsoftTenants,...googleTenants];
  const selectedId=value.startsWith("google:")?value.slice(7):value;
  const selectedName=allTenants.find(t=>t.id===selectedId)?.label||"All tenants";
@@ -11,6 +11,7 @@ export default function TenantSignInFilter({value,microsoftTenants,googleTenants
    <optgroup label="Microsoft 365">{microsoftTenants.map(t=><option key={t.id} value={t.id}>{shortLabel(t.label)}</option>)}</optgroup>
    <optgroup label="Google Workspace">{googleTenants.map(t=><option key={t.id} value={`google:${t.id}`}>{shortLabel(t.label)}</option>)}</optgroup>
   </select>
+  {tz?<input type="hidden" name="tz" value={tz}/>:null}
   {range?<input type="hidden" name="range" value={range}/>:null}
   {from?<input type="hidden" name="from" value={from}/>:null}
   {to?<input type="hidden" name="to" value={to}/>:null}

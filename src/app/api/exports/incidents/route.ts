@@ -6,7 +6,7 @@ export async function GET(req:NextRequest){try{
  if(ids.length>100)return Response.json({error:"Select at most 100 incidents."},{status:400});
  const rows:any[]=[];
  for(let page=1;page<=100;page++){
-  const batch=await getIncidentQueuePage({page,pageSize:100,includeDismissed:ids.length?true:p.get("dismissed")==="1",search:ids.length?undefined:p.get("q")||undefined,range:ids.length?"all":p.get("range")||undefined,from:ids.length?undefined:p.get("from")||undefined,to:ids.length?undefined:p.get("to")||undefined});
+  const batch=await getIncidentQueuePage({page,pageSize:100,includeDismissed:ids.length?true:p.get("dismissed")==="1",search:ids.length?undefined:p.get("q")||undefined,range:ids.length?"all":p.get("range")||undefined,from:ids.length?undefined:p.get("from")||undefined,to:ids.length?undefined:p.get("to")||undefined,tz:p.get("tz")||undefined});
   if(page===1&&batch.total>10000)return Response.json({error:"More than 10,000 incidents match. Narrow the date range."},{status:413});
   rows.push(...batch.rows.filter(r=>!ids.length||ids.includes(r.id)));if(page*100>=batch.total)break;
  }

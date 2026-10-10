@@ -214,7 +214,7 @@ export async function processTenantIncidents(x:{organizationId:string;microsoftT
  });
 }
 
-export async function getIncidentQueuePage(opts:{page?:number;pageSize?:number;includeDismissed?:boolean;includeFailed?:boolean;search?:string;range?:string;from?:string;to?:string}={}){
+export async function getIncidentQueuePage(opts:{page?:number;pageSize?:number;includeDismissed?:boolean;includeFailed?:boolean;search?:string;range?:string;from?:string;to?:string;tz?:string}={}){
  const db=getSupabaseAdmin();
  const page=Math.max(1,opts.page||1),pageSize=Math.min(250,Math.max(25,opts.pageSize||100));
  // Resolve the organization from the authenticated user's membership. The admin client
