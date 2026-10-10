@@ -25,6 +25,6 @@ export default function ExportCsvButton({href,filename}:{href:string;filename:st
  }
  return <>
   <button type="button" className="button" title="Export CSV" aria-label="Export CSV" disabled={state==="working"} onClick={download} style={{width:38,height:38,padding:0,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M5 17v4h14v-4"/></svg></button>
-  {state!=="idle"?<div role="status" aria-live="polite" style={{position:"fixed",left:"50%",top:24,transform:"translateX(-50%)",zIndex:1000,minWidth:280,maxWidth:"min(520px,calc(100vw - 32px))",padding:"11px 16px",borderRadius:8,border:"1px solid rgba(255,255,255,.16)",background:"#172033",boxShadow:"0 8px 28px rgba(0,0,0,.28)",fontSize:14,fontWeight:600,textAlign:"center",color:"#fff"}}>{state==="working"?<span style={{display:"inline-block",marginRight:9}}>⏳</span>:null}{message}</div>:null}
+  {state!=="idle"?<div role="status" aria-live="polite" style={{position:"fixed",left:"50%",top:24,transform:"translateX(-50%)",zIndex:1000,minWidth:280,maxWidth:"min(520px,calc(100vw - 32px))",padding:"11px 16px",borderRadius:8,border:"1px solid rgba(255,255,255,.16)",background:"#172033",boxShadow:"0 8px 28px rgba(0,0,0,.28)",fontSize:14,fontWeight:600,textAlign:"center",color:"#fff"}}>{message}</div>:null}
  </>;
 }
