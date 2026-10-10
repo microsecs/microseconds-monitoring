@@ -1,3 +1,4 @@
+import ExportCsvButton from "@/components/ExportCsvButton";
 import HistoryDateFilter from "@/components/HistoryDateFilter";
 import { getRecentHistoryPage, getTenants, getGoogleTenants } from "@/lib/history";
 import TenantSignInFilter from "./TenantSignInFilter";
@@ -116,7 +117,11 @@ export default async function SigninsPage({
             {search ? <a className="button deleteAction" title="Clear search" aria-label="Clear search" href={`/signins?${new URLSearchParams({...(selectedGoogleTenant?{tenant:`google:${selectedGoogleTenant}`} : selectedTenant?{tenant:selectedTenant}:{}),...(selectedPlatform?{platform:selectedPlatform}:{}),...(showUnsuccessful?{unsuccessful:"1"}:{})}).toString()}`}>×</a> : null}
           </form>
           </div>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>            <div style={{paddingRight:12,borderRight:"1px solid var(--line)"}}>
+              <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{tenant:rawTenant,platform:selectedPlatform,unsuccessful:showUnsuccessful?"1":"",q:search}}/>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"nowrap",paddingRight:12,borderRight:"1px solid var(--line)"}}>
           <TenantSignInFilter
             value={selectedGoogleTenant ? `google:${selectedGoogleTenant}` : selectedTenant}
             microsoftTenants={tenants.map((t: any) => ({ id: t.id, label: t.tenant_name || t.tenant_id }))}
@@ -141,12 +146,7 @@ export default async function SigninsPage({
             </button>
           </form>
           </div>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-            <div style={{paddingRight:12,borderRight:"1px solid var(--line)"}}>
-              <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{tenant:rawTenant,platform:selectedPlatform,unsuccessful:showUnsuccessful?"1":"",q:search}}/>
-            </div>
-            <a className="button" title="Export CSV" aria-label="Export CSV" style={{width:38,height:38,padding:0,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}} href={`/api/exports/signins?${new URLSearchParams({...params,page:""}).toString()}`}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M5 17v4h14v-4"/></svg></a>
-          </div>
+          <div style={{display:"flex",alignItems:"center"}}><ExportCsvButton href={`/api/exports/signins?${new URLSearchParams({...params,page:""}).toString()}`} filename="microseconds-signins.csv" /></div>
         </div>
       </div>
       {error ? <div className="errorBox">{error}</div> : null}

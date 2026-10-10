@@ -1,3 +1,4 @@
+import ExportCsvButton from "@/components/ExportCsvButton";
 import HistoryDateFilter from "@/components/HistoryDateFilter";
 import IncidentActions from "./IncidentActions";
 import BulkIncidentActions from "./BulkIncidentActions";
@@ -57,15 +58,14 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
       {search?<a className="button deleteAction" title="Clear search" aria-label="Clear search" href={`/incidents?dismissed=${includeDismissed?"1":"0"}&page=1`}>×</a>:null}
      </form>
     </div>
+    <div style={{display:"flex",gap:8,alignItems:"center"}}>     <div style={{paddingRight:12,borderRight:"1px solid var(--line)"}}>
+      <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{dismissed:includeDismissed?"1":"",q:search}}/>
+     </div>
+    </div>
     <div style={{display:"flex",gap:8,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>
      <a className="button" style={{fontSize:14}} href={`/incidents?${new URLSearchParams({...params,dismissed:includeDismissed?"0":"1",page:"1"}).toString()}`}>{includeDismissed?"Hide Dismissed":"Show Dismissed"}</a>
     </div>
-    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-     <div style={{paddingRight:12,borderRight:"1px solid var(--line)"}}>
-      <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{dismissed:includeDismissed?"1":"",q:search}}/>
-     </div>
-     <a className="button" title="Export CSV" aria-label="Export CSV" style={{width:38,height:38,padding:0,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}} href={`/api/exports/incidents?${new URLSearchParams({...params,page:""}).toString()}`}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M5 17v4h14v-4"/></svg></a>
-    </div>
+    <div style={{display:"flex",alignItems:"center"}}><ExportCsvButton href={`/api/exports/incidents?${new URLSearchParams({...params,page:""}).toString()}`} filename="microseconds-incidents.csv" /></div>
    </div>
   </div>
   <div className="tenantSummary" aria-label="Incident summary">
