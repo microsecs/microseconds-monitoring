@@ -53,7 +53,7 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
       {(["range","from","to"] as const).map(k=>params[k]?<input key={k} type="hidden" name={k} value={params[k]}/>:null)}
       {includeDismissed?<input type="hidden" name="dismissed" value="1"/>:null}
       <input className="input" type="search" name="q" defaultValue={search} placeholder="Search incidents…" aria-label="Search incidents" style={{width:220,height:38,padding:"0 12px",fontSize:14,borderRadius:8}}/>
-      <button className="button" type="submit">Search</button>
+      <button className="button" type="submit" title="Search" aria-label="Search" style={{width:38,height:38,padding:0,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></button>
       {search?<a className="button deleteAction" title="Clear search" aria-label="Clear search" href={`/incidents?dismissed=${includeDismissed?"1":"0"}&page=1`}>×</a>:null}
      </form>
     </div>
@@ -64,7 +64,7 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
      <div style={{paddingRight:12,borderRight:"1px solid var(--line)"}}>
       <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{dismissed:includeDismissed?"1":"",q:search}}/>
      </div>
-     <a className="button" style={{fontSize:14,fontFamily:"inherit",fontWeight:600,padding:"9px 12px",whiteSpace:"nowrap"}} href={`/api/exports/incidents?${new URLSearchParams({...params,page:""}).toString()}`}>Export CSV</a>
+     <a className="button" title="Export CSV" aria-label="Export CSV" style={{width:38,height:38,padding:0,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}} href={`/api/exports/incidents?${new URLSearchParams({...params,page:""}).toString()}`}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M5 17v4h14v-4"/></svg></a>
     </div>
    </div>
   </div>
