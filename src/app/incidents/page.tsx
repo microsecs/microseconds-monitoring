@@ -58,8 +58,8 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
       {search?<a className="button deleteAction" title="Clear search" aria-label="Clear search" href={`/incidents?dismissed=${includeDismissed?"1":"0"}&page=1`}>×</a>:null}
      </form>
     </div>
-    <div style={{display:"flex",gap:8,alignItems:"center"}}>     <div style={{paddingRight:12,borderRight:"1px solid var(--line)"}}>
-      <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{dismissed:includeDismissed?"1":"",q:search}}/>
+    <div style={{display:"flex",gap:8,alignItems:"center"}}>     <div>
+       <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{dismissed:includeDismissed?"1":"",q:search}}/>
      </div>
     </div>
     <div style={{display:"flex",gap:8,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>
