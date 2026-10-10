@@ -1,3 +1,4 @@
+import {dateBounds} from "@/lib/dateRange";
 import { getSupabaseAdmin, getOrCreateDevOrganization } from "@/lib/supabaseAdmin";
 
 export type HistoryRow = {
@@ -78,7 +79,7 @@ export async function getTenants() {
 
 export async function getRecentHistoryPage(opts:{
   page?:number; pageSize?:number; microsoftTenantId?:string; googleTenantId?:string;
-  platform?:string; includeUnsuccessful?:boolean; search?:string;
+  platform?:string; includeUnsuccessful?:boolean; search?:string; range?:string; from?:string; to?:string;
 }): Promise<{rows:HistoryRow[];total:number;page:number;pageSize:number}> {
   const page=Math.max(1,opts.page||1),pageSize=Math.min(250,Math.max(25,opts.pageSize||100));
   const microsoftTenantId=opts.microsoftTenantId,googleTenantId=opts.googleTenantId,platform=opts.platform;
@@ -96,6 +97,9 @@ export async function getRecentHistoryPage(opts:{
     .order("event_time", { ascending: false })
     .range((page-1)*pageSize,page*pageSize-1);
 
+  const bounds=dateBounds(opts);
+  if(bounds.start)query=query.gte("event_time",bounds.start);
+  if(bounds.end)query=query.lt("event_time",bounds.end);
   if (googleTenantId) {
     query = query.eq("google_workspace_tenant_id", googleTenantId);
   } else if (microsoftTenantId) {

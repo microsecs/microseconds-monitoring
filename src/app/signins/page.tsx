@@ -1,3 +1,4 @@
+import HistoryDateFilter from "@/components/HistoryDateFilter";
 import { getRecentHistoryPage, getTenants, getGoogleTenants } from "@/lib/history";
 import TenantSignInFilter from "./TenantSignInFilter";
 import LocalDateTime from "@/components/LocalDateTime";
@@ -51,9 +52,10 @@ function locationLabel(r: any) {
 export default async function SigninsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tenant?: string; googleTenant?: string; platform?: string; unsuccessful?: string; page?: string; q?: string }>;
+  searchParams?: Promise<{ tenant?: string; googleTenant?: string; platform?: string; unsuccessful?: string; page?: string; q?: string; range?:string;from?:string;to?:string }>;
 }) {
   const params = (await searchParams) || {};
+  const rangeQuery={...(params.range?{range:params.range}:{}),...(params.from?{from:params.from}:{}),...(params.to?{to:params.to}:{})};
   const rawTenant = params.tenant || "";
   const selectedGoogleTenant = params.googleTenant || (rawTenant.startsWith("google:") ? rawTenant.slice(7) : "");
   const selectedTenant = rawTenant.startsWith("google:") ? "" : rawTenant;
@@ -77,7 +79,7 @@ export default async function SigninsPage({
         googleTenantId:selectedGoogleTenant || undefined,
         platform:selectedPlatform || undefined,
         includeUnsuccessful:showUnsuccessful,
-        search:search || undefined
+        search:search || undefined,range:params.range,from:params.from,to:params.to
       }),
       getTenants(),
       getGoogleTenants(),
@@ -105,6 +107,7 @@ export default async function SigninsPage({
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{display:"flex",gap:6,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>
           <form method="get" style={{display:"flex",gap:6,alignItems:"center"}}>
+            {Object.entries(rangeQuery).map(([k,v])=><input key={k} type="hidden" name={k} value={v}/>)}
             {selectedGoogleTenant ? <input type="hidden" name="tenant" value={`google:${selectedGoogleTenant}`} /> : selectedTenant ? <input type="hidden" name="tenant" value={selectedTenant} /> : null}
             {selectedPlatform ? <input type="hidden" name="platform" value={selectedPlatform} /> : null}
             {showUnsuccessful ? <input type="hidden" name="unsuccessful" value="1" /> : null}
@@ -119,10 +122,12 @@ export default async function SigninsPage({
             microsoftTenants={tenants.map((t: any) => ({ id: t.id, label: t.tenant_name || t.tenant_id }))}
             googleTenants={googleTenants.map((t: any) => ({ id: t.id, label: t.display_name || t.primary_domain || "Google Workspace" }))}
             platform={selectedPlatform}
+            range={params.range} from={params.from} to={params.to}
             showUnsuccessful={showUnsuccessful}
           />
 
           <form method="get">
+            {Object.entries(rangeQuery).map(([k,v])=><input key={k} type="hidden" name={k} value={v}/>)}
             {selectedGoogleTenant ? (
               <input type="hidden" name="tenant" value={`google:${selectedGoogleTenant}`} />
             ) : selectedTenant ? (
@@ -139,6 +144,10 @@ export default async function SigninsPage({
         </div>
       </div>
 
+      <div className="card" style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14}}>
+        <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{tenant:rawTenant,platform:selectedPlatform,unsuccessful:showUnsuccessful?"1":"",q:search}}/>
+        <a className="button" href={`/api/exports/signins?${new URLSearchParams({...params,page:""}).toString()}`}>Export CSV</a>
+      </div>
       {error ? <div className="errorBox">{error}</div> : null}
 
       <div className="section card">

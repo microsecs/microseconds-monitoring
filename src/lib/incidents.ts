@@ -1,3 +1,4 @@
+import {dateBounds} from "@/lib/dateRange";
 import { recordBehaviorShadow } from "@/lib/behaviorShadow";
 import { getSupabaseAdmin, getOrCreateDevOrganization } from "@/lib/supabaseAdmin";
 import { createIncidentAnalysis } from "@/lib/aiIncident";
@@ -213,7 +214,7 @@ export async function processTenantIncidents(x:{organizationId:string;microsoftT
  });
 }
 
-export async function getIncidentQueuePage(opts:{page?:number;pageSize?:number;includeDismissed?:boolean;includeFailed?:boolean;search?:string}={}){
+export async function getIncidentQueuePage(opts:{page?:number;pageSize?:number;includeDismissed?:boolean;includeFailed?:boolean;search?:string;range?:string;from?:string;to?:string}={}){
  const db=getSupabaseAdmin();
  const page=Math.max(1,opts.page||1),pageSize=Math.min(250,Math.max(25,opts.pageSize||100));
  // Resolve the organization from the authenticated user's membership. The admin client
@@ -225,11 +226,14 @@ export async function getIncidentQueuePage(opts:{page?:number;pageSize?:number;i
  // contain sign-in status, so fetch candidate incidents in chunks, join sign-ins, filter,
  // then slice the requested page. This prevents page 1 from being empty while the count
  // still says incidents exist.
+ const bounds=dateBounds(opts);
  let candidates:any[]=[];
  const chunkSize=500;
  for(let offset=0;;offset+=chunkSize){
    let q=db.from("security_incidents").select("*").eq("organization_id",o.id);
    if(!opts.includeDismissed)q=q.neq("status","dismissed");
+   if(bounds.start)q=q.gte("created_at",bounds.start);
+   if(bounds.end)q=q.lt("created_at",bounds.end);
    const {data,error}=await q.order("created_at",{ascending:false}).range(offset,offset+chunkSize-1);
    if(error)throw error;
    candidates.push(...(data||[]));
@@ -253,6 +257,11 @@ export async function getIncidentQueuePage(opts:{page?:number;pageSize?:number;i
    });
  }
 
+ const search=(opts.search||"").trim().toLowerCase();
+ if(search){filtered=filtered.filter((x:any)=>{
+  const si=sm0.get(x.signin_id)||{};
+  return [x.title,x.severity,x.status,x.ai_summary,x.ai_classification,...(Array.isArray(x.reasons)?x.reasons:[]),si.user_principal_name,si.user_display_name,si.ip_address,si.city,si.region,si.country,si.app_name].some(v=>String(v||"").toLowerCase().includes(search));
+ });}
  const total=filtered.length,start=(page-1)*pageSize;
  const incidents=filtered.slice(start,start+pageSize);
  if(!incidents.length)return {rows:[],total,page,pageSize};

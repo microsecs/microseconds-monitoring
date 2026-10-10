@@ -1,0 +1,2 @@
+export function csv(rows:(string|number|boolean|null|undefined)[][]){return "\uFEFF"+rows.map(row=>row.map(v=>{let s=String(v??"");if(/^[\s]*[=+@-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}).join(",")).join("\r\n")+"\r\n";}
+export function download(body:string,name:string){return new Response(body,{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":`attachment; filename="${name}"`,"Cache-Control":"no-store"}});}

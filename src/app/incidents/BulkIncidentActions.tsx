@@ -33,6 +33,7 @@ export default function BulkIncidentActions({ids}:{ids:string[]}){
     <span className="subtitle">{chosen.length} selected</span>
     <button className="button" disabled={!chosen.length||!!busy} onClick={()=>setSelected([])}>Clear Selection</button>
     <span aria-hidden="true" style={{height:26,borderLeft:"1px solid var(--line)",margin:"0 2px"}}/>
+    <button className="button" disabled={!chosen.length||!!busy} onClick={()=>{const q=new URLSearchParams({ids:chosen.join(",")});window.location.href=`/api/exports/incidents?${q.toString()}`;}}>Export Selected</button>
     {(["marked_safe","dismissed","confirmed_suspicious"] as Action[]).map(action=><button key={action} className="button" style={{background:action==="marked_safe"?"#15803d":action==="dismissed"?"#1d4ed8":"#b91c1c",color:"#fff",borderColor:"transparent"}} disabled={!chosen.length||!!busy} onClick={()=>apply(action)}>{labels[action]}</button>)}
    </div>
    {error?<div className="errorBox" style={{marginTop:10}}>{error}</div>:null}

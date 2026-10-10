@@ -1,3 +1,4 @@
+import HistoryDateFilter from "@/components/HistoryDateFilter";
 import IncidentActions from "./IncidentActions";
 import BulkIncidentActions from "./BulkIncidentActions";
 import {getIncidentQueuePage} from "@/lib/incidents";
@@ -33,11 +34,11 @@ function privacyLabel(intel:any){
  if(intel.privacy_available===true)return "None detected";
  return "Unknown";
 }
-function href(params:any,page:number){const p=new URLSearchParams();if(params.dismissed==="1")p.set("dismissed","1");if(params.q)p.set("q",params.q);p.set("page",String(page));return `/incidents?${p.toString()}`;}
-export default async function IncidentsPage({searchParams}:{searchParams:Promise<{dismissed?:string;page?:string;q?:string}>}){
+function href(params:any,page:number){const p=new URLSearchParams();if(params.dismissed==="1")p.set("dismissed","1");if(params.q)p.set("q",params.q);for(const k of ["range","from","to"])if(params[k])p.set(k,params[k]);p.set("page",String(page));return `/incidents?${p.toString()}`;}
+export default async function IncidentsPage({searchParams}:{searchParams:Promise<{dismissed?:string;page?:string;q?:string;range?:string;from?:string;to?:string}>}){
  const params=await searchParams,includeDismissed=params.dismissed==="1",search=(params.q||"").trim();
  const page=Math.max(1,Number(params.page||"1")||1),pageSize=100;
- const result=await getIncidentQueuePage({page,pageSize,includeDismissed,includeFailed:false,search:search||undefined});
+ const result=await getIncidentQueuePage({page,pageSize,includeDismissed,includeFailed:false,search:search||undefined,range:params.range,from:params.from,to:params.to});
  const rows=result.rows,total=result.total,totalPages=Math.max(1,Math.ceil(total/pageSize));
  const first=rows.length?(page-1)*pageSize+1:0,last=rows.length?first+rows.length-1:0;
  const active=rows.filter((x:any)=>x.status!=="dismissed");
@@ -49,6 +50,7 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
    <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
     <div style={{display:"flex",gap:6,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>
      <form method="get" style={{display:"flex",gap:6,alignItems:"center"}}>
+      {(["range","from","to"] as const).map(k=>params[k]?<input key={k} type="hidden" name={k} value={params[k]}/>:null)}
       {includeDismissed?<input type="hidden" name="dismissed" value="1"/>:null}
       <input className="input" type="search" name="q" defaultValue={search} placeholder="Search incidents…" aria-label="Search incidents" style={{width:220,height:38,padding:"0 12px",fontSize:14,borderRadius:8}}/>
       <button className="button" type="submit">Search</button>
@@ -56,11 +58,15 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
      </form>
     </div>
     <div style={{display:"flex",gap:8,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>
-     <a className="button" style={{fontSize:14}} href={`/incidents?dismissed=${includeDismissed?"0":"1"}${search?`&q=${encodeURIComponent(search)}`:""}&page=1`}>{includeDismissed?"Hide Dismissed":"Show Dismissed"}</a>
+     <a className="button" style={{fontSize:14}} href={`/incidents?${new URLSearchParams({...params,dismissed:includeDismissed?"0":"1",page:"1"}).toString()}`}>{includeDismissed?"Hide Dismissed":"Show Dismissed"}</a>
     </div>
    </div>
   </div>
 
+  <div className="card" style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14}}>
+   <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{dismissed:includeDismissed?"1":"",q:search}}/>
+   <a className="button" href={`/api/exports/incidents?${new URLSearchParams({...params,page:""}).toString()}`}>Export CSV</a>
+  </div>
   <div className="tenantSummary" aria-label="Incident summary">
    {[
     ["Incidents on This Page",rows.length,"Incidents shown in the current view"],
