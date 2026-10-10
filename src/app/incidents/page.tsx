@@ -60,12 +60,13 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
     <div style={{display:"flex",gap:8,alignItems:"center",paddingRight:12,borderRight:"1px solid var(--line)"}}>
      <a className="button" style={{fontSize:14}} href={`/incidents?${new URLSearchParams({...params,dismissed:includeDismissed?"0":"1",page:"1"}).toString()}`}>{includeDismissed?"Hide Dismissed":"Show Dismissed"}</a>
     </div>
+    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+     <div style={{paddingRight:12,borderRight:"1px solid var(--line)"}}>
+      <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{dismissed:includeDismissed?"1":"",q:search}}/>
+     </div>
+     <a className="button" href={`/api/exports/incidents?${new URLSearchParams({...params,page:""}).toString()}`}>Export CSV</a>
+    </div>
    </div>
-  </div>
-
-  <div className="card" style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14}}>
-   <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{dismissed:includeDismissed?"1":"",q:search}}/>
-   <a className="button" href={`/api/exports/incidents?${new URLSearchParams({...params,page:""}).toString()}`}>Export CSV</a>
   </div>
   <div className="tenantSummary" aria-label="Incident summary">
    {[

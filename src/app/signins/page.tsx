@@ -141,12 +141,13 @@ export default async function SigninsPage({
             </button>
           </form>
           </div>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            <div style={{paddingRight:12,borderRight:"1px solid var(--line)"}}>
+              <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{tenant:rawTenant,platform:selectedPlatform,unsuccessful:showUnsuccessful?"1":"",q:search}}/>
+            </div>
+            <a className="button" href={`/api/exports/signins?${new URLSearchParams({...params,page:""}).toString()}`}>Export CSV</a>
+          </div>
         </div>
-      </div>
-
-      <div className="card" style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14}}>
-        <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{tenant:rawTenant,platform:selectedPlatform,unsuccessful:showUnsuccessful?"1":"",q:search}}/>
-        <a className="button" href={`/api/exports/signins?${new URLSearchParams({...params,page:""}).toString()}`}>Export CSV</a>
       </div>
       {error ? <div className="errorBox">{error}</div> : null}
 
