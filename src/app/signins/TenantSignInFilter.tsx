@@ -4,7 +4,7 @@ export default function TenantSignInFilter({value,microsoftTenants,googleTenants
  const allTenants=[...microsoftTenants,...googleTenants];
  const selectedId=value.startsWith("google:")?value.slice(7):value;
  const selectedName=allTenants.find(t=>t.id===selectedId)?.label||"All tenants";
- const shortLabel=(label:string)=>label.length>22?label.slice(0,21).trimEnd()+"…":label;
+ const shortLabel=(label:string)=>label.length>22?label.slice(0,19).trimEnd()+"…\u00a0\u00a0":label;
  return <form method="get">
   <select name="tenant" value={value} className="select" title={selectedName} aria-label="Filter by tenant" style={{width:185,maxWidth:185,height:38,fontSize:14,textOverflow:"ellipsis",overflow:"hidden",whiteSpace:"nowrap"}} onChange={(e)=>e.currentTarget.form?.requestSubmit()}>
    <option value="">All tenants</option>
