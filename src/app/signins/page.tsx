@@ -117,7 +117,7 @@ export default async function SigninsPage({
             {search ? <a className="button deleteAction" title="Clear search" aria-label="Clear search" href={`/signins?${new URLSearchParams({...(selectedGoogleTenant?{tenant:`google:${selectedGoogleTenant}`} : selectedTenant?{tenant:selectedTenant}:{}),...(selectedPlatform?{platform:selectedPlatform}:{}),...(showUnsuccessful?{unsuccessful:"1"}:{})}).toString()}`}>×</a> : null}
           </form>
           </div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>            <div style={{paddingRight:12,borderRight:"1px solid var(--line)"}}>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>            <div>
               <HistoryDateFilter range={params.range} from={params.from} to={params.to} preserve={{tenant:rawTenant,platform:selectedPlatform,unsuccessful:showUnsuccessful?"1":"",q:search}}/>
             </div>
           </div>
