@@ -28,24 +28,50 @@ export async function recordBehaviorShadow(input: {
  const familiarCity=matches("city",input.city);
  const familiarCountry=matches("country",input.country);
  const familiarApp=matches("app_name",input.application);
- if(history.length>=5){
-  if(input.ip && !history.some(r=>r.ip_address===input.ip)) {adjustment+=8;reasons.push("Previously unseen IP in established user history (+8)");}
-  if(input.country && !history.some(r=>String(r.country||"").toLowerCase()===input.country!.toLowerCase())) {adjustment+=12;reasons.push("Previously unseen country in established user history (+12)");}
-  if(input.application && !history.some(r=>String(r.app_name||"").toLowerCase()===input.application!.toLowerCase())) {adjustment+=5;reasons.push("Previously unseen application in established user history (+5)");}
+ // Phase 2C refinement: novelty alone is not evidence of a threat.
+ // Require a mature history and multiple independent novel signals. The
+ // existing rules and administrator-confirmed feedback remain authoritative.
+ const norm=(v?:string|null)=>String(v||"").trim().toLowerCase();
+ const unseen=(field:"ip_address"|"country"|"app_name",value?:string|null)=>
+  !!norm(value)&&!history.some(r=>norm(r[field])===norm(value));
+ const newIp=unseen("ip_address",input.ip);
+ const newCountry=unseen("country",input.country);
+ const newApp=unseen("app_name",input.application);
+ const mature=history.length>=10;
+ const verifiedSafe=input.feedbackSafeAdjustment>0;
+ const verifiedSuspicious=input.feedbackSuspiciousAdjustment>0;
+ if(!mature){
+  reasons.push("Insufficient prior observations for behavioral risk adjustment (minimum 10)");
+ }else if(verifiedSafe&&!verifiedSuspicious){
+  // A matching administrator-verified safe pattern already lowered live risk.
+  // Do not counteract that decision with generic novelty points.
+  reasons.push("Matching verified-safe feedback: no novelty-based shadow increase");
+ }else if(newIp&&newCountry){
+  adjustment=8;
+  reasons.push("Unseen IP and country together in established user history (+8)");
+  if(newApp){adjustment+=4;reasons.push("Unseen application alongside IP and country change (+4)");}
+ }else if(newIp&&newApp){
+  adjustment=4;
+  reasons.push("Unseen IP and application together in established user history (+4)");
+ }else if(newIp||newCountry||newApp){
+  reasons.push("Single unfamiliar attribute observed; no standalone behavioral risk increase");
  }
  // Existing administrator feedback is already included in the live score.
  // Never double-apply it in shadow mode; capture it for audit and future comparisons.
  if(input.feedbackSafeAdjustment>0) reasons.push(`Verified-safe feedback already included in live score (-${input.feedbackSafeAdjustment})`);
  if(input.feedbackSuspiciousAdjustment>0) reasons.push(`Confirmed-suspicious feedback already included in live score (+${input.feedbackSuspiciousAdjustment})`);
  if(familiarIp && familiarCountry) reasons.push("Familiar IP and country observed (no automatic trust)");
- const proposed=Math.max(0,Math.min(100,input.liveScore+Math.min(25,adjustment)));
+ const proposed=Math.max(0,Math.min(100,input.liveScore+Math.min(12,adjustment)));
  const {error:saveError}=await db.from("behavior_shadow_assessments").upsert({
   organization_id:input.organizationId,provider:input.provider,tenant_record_id:input.tenantRecordId,
   signin_id:input.signinId,user_principal_name:user,event_time:input.eventTime,
   live_score:input.liveScore,proposed_score:proposed,adjustment:proposed-input.liveScore,
   reasons,history_count:history.length,
   evidence:{familiar_ip:familiarIp,familiar_city:familiarCity,familiar_country:familiarCountry,familiar_application:familiarApp,
-   feedback_safe_adjustment:input.feedbackSafeAdjustment,feedback_suspicious_adjustment:input.feedbackSuspiciousAdjustment},
+   feedback_safe_adjustment:input.feedbackSafeAdjustment,feedback_suspicious_adjustment:input.feedbackSuspiciousAdjustment,
+   novel_ip:newIp,novel_country:newCountry,novel_application:newApp,
+   mature_history:mature,verified_safe_match:verifiedSafe,verified_suspicious_match:verifiedSuspicious,
+   shadow_policy_version:"2c-conservative-20261017"},
   updated_at:new Date().toISOString()
  },{onConflict:"signin_id"});
  if(saveError) throw saveError;
