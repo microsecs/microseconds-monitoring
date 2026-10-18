@@ -6,6 +6,7 @@ import { syncGoogleWorkspaceTenant } from "@/lib/googleSync";
 import { processProviderIncidents } from "@/lib/incidents";
 import { getOrganizationNotificationSettings } from "@/lib/notificationSettings";
 import { sendConsolidatedIncidentAlert, type AlertCandidate } from "@/lib/emailAlerts";
+import { markMonitoringHealthy, recordMonitoringFailure } from "@/lib/monitoringHealth";
 
 type Job = {id:string;organization_id:string;provider:"microsoft"|"google";tenant_record_id:string;lease_token:string;attempts:number};
 const db = () => getSupabaseAdmin();
@@ -77,6 +78,7 @@ async function executeJob(job:Job):Promise<{ok:boolean;reason?:string;candidates
         since=imp?.imported_at||undefined;
       }
       await syncMicrosoftTenant({organizationId:job.organization_id,microsoftTenantRecordId:t.id,microsoftTenantId:t.tenant_id,since});
+      await markMonitoringHealthy("microsoft",t.id);
       const result=await processProviderIncidents({organizationId:job.organization_id,provider:"microsoft",tenantRecordId:t.id,tenantName:t.tenant_name||t.tenant_id,since,sendAlerts:false});
       return {ok:true,candidates:result.alertCandidates||[]};
     }
@@ -86,9 +88,26 @@ async function executeJob(job:Job):Promise<{ok:boolean;reason?:string;candidates
     if(!t) return {ok:true,reason:"Tenant deleted",candidates:[]};
     const since=t.last_sync_at||undefined;
     await syncGoogleWorkspaceTenant(t,{automatic:true});
+    await markMonitoringHealthy("google",t.id);
     const result=await processProviderIncidents({organizationId:job.organization_id,provider:"google",tenantRecordId:t.id,tenantName:t.display_name||t.primary_domain||"Google Workspace",since,sendAlerts:false});
     return {ok:true,candidates:result.alertCandidates||[]};
-  } catch(e){return {ok:false,reason:fail(e),candidates:[]};}
+  } catch(e){
+    // Background failures must update the same tenant health fields as manual sync.
+    // Otherwise an expired refresh token is silently displayed as Healthy indefinitely.
+    try {
+      const tenantTable=job.provider==="google"?"google_workspace_tenants":"microsoft_tenants";
+      const {data:tenant}=await client.from(tenantTable)
+        .select(job.provider==="google"?"id,display_name,primary_domain":"id,tenant_name,tenant_id")
+        .eq("id",job.tenant_record_id).eq("organization_id",job.organization_id).maybeSingle();
+      if(tenant){
+        const record=tenant as any;
+        await recordMonitoringFailure({provider:job.provider,organizationId:job.organization_id,
+          tenantId:record.id,tenantName:record.display_name||record.tenant_name||record.primary_domain||record.tenant_id||"Tenant",
+          error:e,sendAlert:true});
+      }
+    } catch(healthError){console.error(`[queue] health update failed: ${fail(healthError)}`);}
+    return {ok:false,reason:fail(e),candidates:[]};
+  }
   finally {if(lockToken) await releaseTenantSyncLock(job.provider,job.tenant_record_id,lockToken);}
 }
 
