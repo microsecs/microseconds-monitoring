@@ -35,7 +35,26 @@ export type AlertCandidate={organizationId:string;incident:any;signin:any;tenant
 export async function sendConsolidatedIncidentAlert(params:{organizationId:string;recipients:string[];candidates:AlertCandidate[]}){
  const db=getSupabaseAdmin();
  const recipients=Array.from(new Set((params.recipients||[]).map(x=>String(x).trim().toLowerCase()).filter(Boolean)));
- const candidates=(params.candidates||[]).filter(x=>x?.incident?.id).sort((a,b)=>severityRank(a.incident?.severity)-severityRank(b.incident?.severity));
+ // Recheck persistence at dispatch time: never email an incident that was deleted,
+ // rolled back, or belongs to another organization after candidate generation.
+ const proposed=(params.candidates||[]).filter(x=>x?.incident?.id);
+ const persisted=new Map<string,any>();
+ const candidateIds=Array.from(new Set(proposed.map(x=>String(x.incident.id))));
+ for(let i=0;i<candidateIds.length;i+=100){
+  const {data,error}=await db.from("security_incidents")
+   .select("id,organization_id,signin_id,risk_score,severity,reasons,alerted_at")
+   .eq("organization_id",params.organizationId).in("id",candidateIds.slice(i,i+100));
+  if(error)throw new Error(`[alerts] Could not verify persisted incidents: ${error.message}`);
+  for(const record of data||[])persisted.set(String(record.id),record);
+ }
+ const candidates=proposed.filter(x=>{
+  const saved=persisted.get(String(x.incident.id));
+  return saved && String(saved.signin_id)===String(x.signin?.id||"");
+ }).map(x=>({...x,incident:{...x.incident,...persisted.get(String(x.incident.id))}}))
+   .sort((a,b)=>severityRank(a.incident?.severity)-severityRank(b.incident?.severity));
+ if(candidates.length!==proposed.length){
+  console.error(`[alerts] ${params.organizationId}: rejected ${proposed.length-candidates.length} incident candidate(s) without a matching persisted incident/sign-in`);
+ }
  if(!smtpConfigured()){ console.error(`[alerts] ${params.organizationId}: SMTP_PASSWORD is missing`); return {sent:0,incidentsAlerted:0,reason:"missing_smtp_password"}; }
  if(!recipients.length){ console.warn(`[alerts] ${params.organizationId}: no alert recipients configured`); return {sent:0,incidentsAlerted:0,reason:"no_recipients"}; }
  if(!candidates.length){ console.log(`[alerts] ${params.organizationId}: no eligible incidents`); return {sent:0,incidentsAlerted:0,reason:"no_candidates"}; }
@@ -59,7 +78,8 @@ export async function sendConsolidatedIncidentAlert(params:{organizationId:strin
 
  for(const recipient of recipients){
   const ids=candidates.map(x=>x.incident.id);
-  const {data:already}=await db.from("incident_email_alert_log").select("incident_id").eq("organization_id",params.organizationId).eq("recipient",recipient).in("incident_id",ids);
+  const {data:already,error:alreadyError}=await db.from("incident_email_alert_log").select("incident_id").eq("organization_id",params.organizationId).eq("recipient",recipient).in("incident_id",ids);
+  if(alreadyError)throw new Error(`[alerts] Failed to check email deduplication: ${alreadyError.message}`);
   const done=new Set((already||[]).map((x:any)=>String(x.incident_id)));
   const pending=candidates.filter(x=>!done.has(String(x.incident.id)));
   if(!pending.length){ console.log(`[alerts] ${params.organizationId}: ${recipient} has no pending incidents`); continue; }

@@ -82,7 +82,8 @@ export async function processProviderIncidents(x:{
  let created=0,alerted=0;
  const alertCandidates:any[]=[];
  for(const s of rows||[]){
-  const {data:old}=await db.from("security_incidents").select("*").eq("signin_id",s.id).maybeSingle();
+  const {data:old,error:existingError}=await db.from("security_incidents").select("*").eq("organization_id",x.organizationId).eq("signin_id",s.id).maybeSingle();
+  if(existingError)throw new Error(`[incidents] Existing incident lookup failed for sign-in ${s.id}: ${existingError.message}`);
   // Existing, not-yet-alerted incidents remain eligible for the consolidated email.
   // This lets a failed/missed email submission retry on a later automatic run instead of
   // permanently losing the alert simply because the incident row already exists.
