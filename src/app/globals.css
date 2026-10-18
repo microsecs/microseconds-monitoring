@@ -241,6 +241,8 @@ body{min-height:100vh}
 
 /* Recovery link shown only when OAuth/authorization truly requires reconnection. */
 .tenantReconnectLink{display:inline-block;margin-top:5px;font-size:12px;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+.tenantReconnectLink,.tenantReconnectLink:visited{color:#38bdf8}
+.tenantReconnectLink:hover{color:#7dd3fc}
 /* Product Admin behavioral-learning diagnostics */
 .learningFilters{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:16px 0 20px}
 .learningFilters label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:12px}

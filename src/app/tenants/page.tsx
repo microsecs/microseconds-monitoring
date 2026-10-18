@@ -713,7 +713,9 @@ export default function TenantsPage() {
                   <td style={{ minWidth: 210 }}>
                     <div className="tenantName">{g.display_name}</div>
                     {healthBadge(g.connection_status, g.last_sync_error) ? <div className="tenantHealth">{healthBadge(g.connection_status, g.last_sync_error)}</div> : <div className="tenantHealthy">Connection healthy</div>}
-                    <div><a className="tenantReconnectLink" href="/api/google/connect" title="Renew Google Workspace authorization without deleting historical data">Reconnect Google Workspace</a></div>
+                    {g.connection_status === "reconnect_required" ? (
+                      <div><a className="tenantReconnectLink" href="/api/google/connect" title="Renew Google Workspace authorization without deleting historical data">Reconnect Google Workspace</a></div>
+                    ) : null}
                   </td>
                   <td style={{ minWidth: 130 }}>
                     <span className="pill normal">Google Workspace</span>
