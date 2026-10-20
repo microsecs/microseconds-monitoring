@@ -1,3 +1,4 @@
+import LocationMapLink from "@/components/LocationMapLink";
 import BrowserTimeZoneSync from "@/components/BrowserTimeZoneSync";
 import ExportCsvButton from "@/components/ExportCsvButton";
 import HistoryDateFilter from "@/components/HistoryDateFilter";
@@ -264,7 +265,7 @@ export default async function SigninsPage({
                     ) : null}
                   </td>
 
-                  <td className="signinsLocationCell" style={{ verticalAlign: "middle" }}>{locationLabel(r)}</td>
+                  <td className="signinsLocationCell" style={{ verticalAlign: "middle" }}><LocationMapLink location={locationLabel(r)} /></td>
 
                   <td style={{ verticalAlign: "middle" }}>
                     {privacyLabel(r)}
