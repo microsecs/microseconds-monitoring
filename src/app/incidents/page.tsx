@@ -105,7 +105,7 @@ export default async function IncidentsPage({searchParams}:{searchParams:Promise
      <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",columnGap:28,rowGap:16,marginTop:18}}>
       <div><div className="subtitle">User</div><div>{s.user_display_name||s.user_principal_name||"Historical incident"}</div>{s.user_display_name&&s.user_principal_name&&String(s.user_display_name).trim().toLowerCase()!==String(s.user_principal_name).trim().toLowerCase()?<div className="subtitle">{s.user_principal_name}</div>:null}</div>
       <div style={{minWidth:0}}><div className="subtitle">IP Address</div><div style={{overflowWrap:"anywhere",wordBreak:"break-word"}}>{s.ip_address||"Not retained"}</div></div>
-      <div style={{minWidth:0}}><div className="subtitle">Location</div><LocationMapLink location={location} preview /></div>
+      <div style={{minWidth:0}}><div className="subtitle">Location</div><LocationMapLink location={location} /></div>
       <div><div className="subtitle">Network</div><div>{s.intel?.provider||s.intel?.asn||"Unknown"}</div></div>
       <div><div className="subtitle">VPN / Privacy</div><div>{privacyLabel(s.intel)}</div></div>
       <div><div className="subtitle">Application</div><div>{s.app_name||platform}</div></div>

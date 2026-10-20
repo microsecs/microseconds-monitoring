@@ -260,5 +260,3 @@ body{min-height:100vh}
 /* Approximate location links: only highlighted when hovered or focused. */
 .locationMapLink { color: inherit; text-decoration: none; transition: color .15s ease; }
 .locationMapLink:hover, .locationMapLink:focus-visible { color: #38bdf8; text-decoration: underline; }
-.locationMapLinkIcon { opacity: 0; color: #38bdf8; transition: opacity .15s ease; }
-.locationMapLink:hover .locationMapLinkIcon, .locationMapLink:focus-visible .locationMapLinkIcon { opacity: 1; }
