@@ -37,9 +37,9 @@ export default function IncidentsNavLink({initialCount=0}:{initialCount?:number}
   window.addEventListener("microseconds:incidents-changed",onIncidentsChanged);
   return()=>{active=false;window.clearInterval(id);window.removeEventListener("focus",onFocus);window.removeEventListener("microseconds:incidents-changed",onIncidentsChanged);};
  },[]);
- return <Link href="/incidents" style={{display:"inline-flex",alignItems:"center",gap:6}}>
+ return <Link href="/incidents" style={{display:"inline-flex",alignItems:"center",gap:5}}>
   <span>Incidents</span>
-  <span style={{display:"inline-flex",width:30,flex:"0 0 30px",alignItems:"center",justifyContent:"center"}}>
+  <span style={{display:"inline-flex",width:24,flex:"0 0 24px",alignItems:"center",justifyContent:"center"}}>
    {count>0?<span aria-label={`${count} incidents pending`} title={`${count} incidents pending`} style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:19,height:19,padding:"0 5px",borderRadius:999,background:"#dc2626",color:"white",fontSize:11,fontWeight:700,lineHeight:1,boxSizing:"border-box"}}>{count>99?"99+":count}</span>:null}
   </span>
  </Link>;
