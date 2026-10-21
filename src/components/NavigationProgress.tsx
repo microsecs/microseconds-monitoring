@@ -14,12 +14,15 @@ export default function NavigationProgress() {
 
   useEffect(() => {
     const click = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      const anchor = target?.closest("a") as HTMLAnchorElement | null;
-      if (!anchor) return;
+      if (event.defaultPrevented || event.button !== 0) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a") as HTMLAnchorElement | null;
+      if (!anchor || anchor.hasAttribute("download")) return;
       if (anchor.target === "_blank" || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const url = new URL(anchor.href, window.location.href);
       if (url.origin !== window.location.origin) return;
+      if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash === window.location.hash) return;
       if (url.pathname === window.location.pathname && url.search === window.location.search) return;
       setLoading(true);
     };
@@ -29,9 +32,11 @@ export default function NavigationProgress() {
 
   if (!loading) return null;
   return (
-    <>
-      <div className="pageLoadBar" />
-      <div className="pageLoadBadge"><span className="spinner" /> Loading…</div>
-    </>
+    <div className="syncOverlay" role="status" aria-live="polite" aria-label="Loading page">
+      <div className="syncOverlayCard">
+        <span className="spinner spinnerLarge" aria-hidden="true" />
+        <div><strong>Loading...</strong><div className="muted">Retrieving the latest information</div></div>
+      </div>
+    </div>
   );
 }
