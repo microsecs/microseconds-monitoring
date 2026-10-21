@@ -4,10 +4,9 @@ import {useEffect,useState} from "react";
 
 // Keep the last successfully retrieved value through client-side navigation.
 // A pending refresh must never temporarily reset the badge to zero.
-let lastKnownPendingCount = 0;
 
-export default function IncidentsNavLink(){
- const [count,setCount]=useState(lastKnownPendingCount);
+export default function IncidentsNavLink({initialCount=0}:{initialCount?:number}){
+ const [count,setCount]=useState(initialCount);
  useEffect(()=>{
   let active=true;
   const load=async()=>{
@@ -18,6 +17,7 @@ export default function IncidentsNavLink(){
     if(!active)return;
     const next=Math.max(0,Number(j.count)||0);
     lastKnownPendingCount=next;
+    document.cookie=`ms_pending_incident_count=${next}; Path=/; Max-Age=2592000; SameSite=Lax${location.protocol==="https:"?"; Secure":""}`;
     setCount(next);
    }catch{}
   };

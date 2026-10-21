@@ -1,6 +1,7 @@
 import "./globals.css";
 import Link from "next/link";
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import NavigationProgress from "@/components/NavigationProgress";
 import IncidentsNavLink from "@/components/IncidentsNavLink";
 import AuthControls from "@/components/AuthControls";
@@ -21,6 +22,9 @@ export const metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
+  const storedCount = cookieStore.get("ms_pending_incident_count")?.value;
+  const initialIncidentCount = storedCount !== undefined && /^\d{1,7}$/.test(storedCount) ? Number(storedCount) : 0;
   const sb = await getSupabaseServer();
   const { data: { user } } = await sb.auth.getUser();
 
@@ -36,7 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </Link>
             <nav className="topNav">
               <Link href="/tenants">Tenants</Link>
-              <IncidentsNavLink/>
+              <IncidentsNavLink initialCount={initialIncidentCount}/>
               <Link href="/signins">Sign-in History</Link>
               <Link href="/import">Import CSV</Link>
               <Link href="/settings">Settings</Link>
