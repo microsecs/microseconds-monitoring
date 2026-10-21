@@ -78,7 +78,7 @@ export default async function SigninsPage({
   // Persist the browser's IANA time zone across page navigation. On the very
   // first visit, wait for the browser to supply it instead of flashing UTC.
   const savedZone = (await cookies()).get("microseconds_browser_tz")?.value || "";
-  const candidateZone = params.tz || savedZone;
+  const candidateZone = savedZone || params.tz;
   let displayZone = "";
   try { if (candidateZone) { new Intl.DateTimeFormat("en-US", {timeZone:candidateZone}); displayZone=candidateZone; } } catch {}
   const rangeQuery={...(displayZone?{tz:displayZone}:{}),...(params.range?{range:params.range}:{}),...(params.from?{from:params.from}:{}),...(params.to?{to:params.to}:{})};
