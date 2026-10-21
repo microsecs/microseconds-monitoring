@@ -2,6 +2,8 @@
 import Link from "next/link";
 import {useEffect,useState} from "react";
 
+// Preserve the last fetched incident count across client navigation.
+// This module-level variable must be declared for TypeScript production builds.
 // Keep the last successfully retrieved value through client-side navigation.
 // A pending refresh must never temporarily reset the badge to zero.
 
