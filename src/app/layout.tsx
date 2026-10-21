@@ -1,5 +1,7 @@
 import "./globals.css";
 import Link from "next/link";
+import { Suspense } from "react";
+import NavigationProgress from "@/components/NavigationProgress";
 import IncidentsNavLink from "@/components/IncidentsNavLink";
 import AuthControls from "@/components/AuthControls";
 import ProductAdminNavLink from "@/components/ProductAdminNavLink";
@@ -25,6 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <body>
+        {user && <Suspense fallback={null}><NavigationProgress /></Suspense>}
         {user && (
           <header className="siteHeader">
             <Link href="/tenants" className="headerBrand" aria-label="MicroSECONDS Monitoring">
