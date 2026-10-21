@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import LocationMapLink from "@/components/LocationMapLink";
 import BrowserTimeZoneSync from "@/components/BrowserTimeZoneSync";
 import ExportCsvButton from "@/components/ExportCsvButton";
@@ -8,6 +9,7 @@ import TenantSignInFilter from "./TenantSignInFilter";
 // BrowserTimeZoneSync keeps the tz query parameter aligned with the browser.
 function signInDateTime(value: unknown, mode: "date" | "time", timeZone?: string) {
   if (!value) return "—";
+  if (!timeZone) return "…";
   const date = new Date(String(value));
   if (Number.isNaN(date.getTime())) return "—";
   let zone = timeZone || "UTC";
@@ -73,7 +75,13 @@ export default async function SigninsPage({
   searchParams?: Promise<{ tenant?: string; googleTenant?: string; platform?: string; unsuccessful?: string; page?: string; q?: string; range?:string;from?:string;to?:string;tz?:string }>;
 }) {
   const params = (await searchParams) || {};
-  const rangeQuery={...(params.tz?{tz:params.tz}:{}),...(params.range?{range:params.range}:{}),...(params.from?{from:params.from}:{}),...(params.to?{to:params.to}:{})};
+  // Persist the browser's IANA time zone across page navigation. On the very
+  // first visit, wait for the browser to supply it instead of flashing UTC.
+  const savedZone = (await cookies()).get("microseconds_browser_tz")?.value || "";
+  const candidateZone = params.tz || savedZone;
+  let displayZone = "";
+  try { if (candidateZone) { new Intl.DateTimeFormat("en-US", {timeZone:candidateZone}); displayZone=candidateZone; } } catch {}
+  const rangeQuery={...(displayZone?{tz:displayZone}:{}),...(params.range?{range:params.range}:{}),...(params.from?{from:params.from}:{}),...(params.to?{to:params.to}:{})};
   const rawTenant = params.tenant || "";
   const selectedGoogleTenant = params.googleTenant || (rawTenant.startsWith("google:") ? rawTenant.slice(7) : "");
   const selectedTenant = rawTenant.startsWith("google:") ? "" : rawTenant;
@@ -97,7 +105,7 @@ export default async function SigninsPage({
         googleTenantId:selectedGoogleTenant || undefined,
         platform:selectedPlatform || undefined,
         includeUnsuccessful:showUnsuccessful,
-        search:search || undefined,range:params.range,from:params.from,to:params.to,tz:params.tz
+        search:search || undefined,range:params.range,from:params.from,to:params.to,tz:displayZone || undefined
       }),
       getTenants(),
       getGoogleTenants(),
@@ -136,7 +144,7 @@ export default async function SigninsPage({
           </form>
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>            <div>
-              <HistoryDateFilter range={params.range} from={params.from} to={params.to} tz={params.tz} preserve={{tenant:rawTenant,platform:selectedPlatform,unsuccessful:showUnsuccessful?"1":"",q:search}}/>
+              <HistoryDateFilter range={params.range} from={params.from} to={params.to} tz={displayZone} preserve={{tenant:rawTenant,platform:selectedPlatform,unsuccessful:showUnsuccessful?"1":"",q:search}}/>
             </div>
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"nowrap",paddingRight:12,borderRight:"1px solid var(--line)"}}>
@@ -145,7 +153,7 @@ export default async function SigninsPage({
             microsoftTenants={tenants.map((t: any) => ({ id: t.id, label: t.tenant_name || t.tenant_id }))}
             googleTenants={googleTenants.map((t: any) => ({ id: t.id, label: t.display_name || t.primary_domain || "Google Workspace" }))}
             platform={selectedPlatform}
-            range={params.range} from={params.from} to={params.to} tz={params.tz}
+            range={params.range} from={params.from} to={params.to} tz={displayZone}
             showUnsuccessful={showUnsuccessful}
           />
 
@@ -228,10 +236,10 @@ export default async function SigninsPage({
                   }
                 >
                   <td className="nowrap" style={{ verticalAlign: "middle" }}>
-                    <strong>{signInDateTime(r.event_time, "date", params.tz)}</strong>
+                    <strong>{signInDateTime(r.event_time, "date", displayZone)}</strong>
                     {r.event_time ? (
                       <div className="subtitle" style={{ marginTop: 2 }}>
-                        {signInDateTime(r.event_time, "time", params.tz)}
+                        {signInDateTime(r.event_time, "time", displayZone)}
                       </div>
                     ) : null}
                   </td>
