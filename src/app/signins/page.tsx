@@ -1,28 +1,11 @@
 import { cookies } from "next/headers";
 import LocationMapLink from "@/components/LocationMapLink";
+import BrowserLocalSignInTime from "@/components/BrowserLocalSignInTime";
 import BrowserTimeZoneSync from "@/components/BrowserTimeZoneSync";
 import ExportCsvButton from "@/components/ExportCsvButton";
 import HistoryDateFilter from "@/components/HistoryDateFilter";
 import { getRecentHistoryPage, getTenants, getGoogleTenants } from "@/lib/history";
 import TenantSignInFilter from "./TenantSignInFilter";
-// Render timestamps on the server instead of showing hydration placeholders.
-// BrowserTimeZoneSync keeps the tz query parameter aligned with the browser.
-function signInDateTime(value: unknown, mode: "date" | "time", timeZone?: string) {
-  if (!value) return "—";
-  if (!timeZone) return "…";
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return "—";
-  let zone = timeZone || "UTC";
-  try { new Intl.DateTimeFormat("en-US", { timeZone: zone }); }
-  catch { zone = "UTC"; }
-  if (mode === "date") return new Intl.DateTimeFormat("en-US", {
-    timeZone: zone, month: "short", day: "numeric", year: "numeric"
-  }).format(date);
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: zone, hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short"
-  }).format(date);
-}
-
 export const dynamic = "force-dynamic";
 
 function cleanRiskReasons(input:any[] = []) {
@@ -236,10 +219,10 @@ export default async function SigninsPage({
                   }
                 >
                   <td className="nowrap" style={{ verticalAlign: "middle" }}>
-                    <strong>{signInDateTime(r.event_time, "date", displayZone)}</strong>
+                    <strong><BrowserLocalSignInTime value={r.event_time} mode="date" /></strong>
                     {r.event_time ? (
                       <div className="subtitle" style={{ marginTop: 2 }}>
-                        {signInDateTime(r.event_time, "time", displayZone)}
+                        <BrowserLocalSignInTime value={r.event_time} mode="time" />
                       </div>
                     ) : null}
                   </td>
