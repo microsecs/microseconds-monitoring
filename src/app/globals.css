@@ -256,3 +256,17 @@ body{min-height:100vh}
 /* Approximate location links: only highlighted when hovered or focused. */
 .locationMapLink { color: inherit; text-decoration: none; transition: color .15s ease; }
 .locationMapLink:hover, .locationMapLink:focus-visible { color: #38bdf8; text-decoration: underline; }
+
+/* Navigation uses the same full-width PageLoading panel as route loading.tsx. */
+.navigationLoadingPanel {
+  position: fixed;
+  z-index: 9000;
+  top: 70px;
+  left: 0;
+  right: 0;
+  bottom: 44px;
+  padding: 20px;
+  background: var(--bg);
+  overflow: auto;
+}
+.navigationLoadingPanel .pageLoadingPanel { width: 100%; }

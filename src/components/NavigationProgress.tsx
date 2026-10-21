@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import PageLoading from "@/components/PageLoading";
 
 export default function NavigationProgress() {
   const pathname = usePathname();
@@ -32,11 +33,8 @@ export default function NavigationProgress() {
 
   if (!loading) return null;
   return (
-    <div className="syncOverlay" role="status" aria-live="polite" aria-label="Loading page">
-      <div className="syncOverlayCard">
-        <span className="spinner spinnerLarge" aria-hidden="true" />
-        <div><strong>Loading...</strong><div className="muted">Retrieving the latest information</div></div>
-      </div>
+    <div className="navigationLoadingPanel" aria-label="Loading page">
+      <PageLoading />
     </div>
   );
 }
