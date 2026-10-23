@@ -8,6 +8,11 @@ import {
 } from "@/lib/graph";
 import { requireWritableOrganization, getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
+function isGraphThrottled(message:string){
+ const m=String(message||"").toLowerCase();
+ return m.includes("throttl")||m.includes("too many requests")||m.includes("429")||m.includes("retry-after");
+}
+
 function isPermissionPropagationError(message: string) {
   const s = String(message || "").toLowerCase();
   return (
@@ -47,7 +52,7 @@ async function verifySignInAccessWithRetry(accessToken: string) {
       return { available: true as const, permissionPending: false };
     } catch (e: any) {
       lastError = e;
-      if (!isPermissionPropagationError(e?.message || "")) throw e;
+      if (!isPermissionPropagationError(e?.message || "") && !isGraphThrottled(e?.message || "")) throw e;
     }
   }
 
@@ -103,7 +108,7 @@ export async function GET(req: NextRequest) {
 
   const { data: existing, error: findError } = await supabase
     .from("microsoft_tenants")
-    .select("id,tenant_name")
+    .select("id,tenant_name,automatic_monitoring_available")
     .eq("organization_id", org.id)
     .eq("tenant_id", tenantId)
     .maybeSingle();
@@ -114,6 +119,7 @@ export async function GET(req: NextRequest) {
 
   let automaticMonitoringAvailable: boolean | null = null;
   let graphFriendlyName: string | null = null;
+  let validationDeferred = false;
 
   try {
     const accessToken = await getAppAccessToken(tenantId);
@@ -138,10 +144,18 @@ export async function GET(req: NextRequest) {
       }
     }
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message || "Could not validate Microsoft Graph access." },
-      { status: 500 }
-    );
+    if(isGraphThrottled(e?.message||"")){
+      // Admin consent succeeded. Microsoft is rate-limiting Graph validation,
+      // so keep the tenant and retry validation on a later sync.
+      validationDeferred=true;
+      automaticMonitoringAvailable=existing?.automatic_monitoring_available ?? null;
+      console.warn("[microsoft-callback] Graph throttled; validation deferred", e?.message);
+    }else{
+      return NextResponse.json(
+        { error: e?.message || "Could not validate Microsoft Graph access." },
+        { status: 500 }
+      );
+    }
   }
 
   let tenantRecordId = existing?.id;
@@ -191,7 +205,7 @@ export async function GET(req: NextRequest) {
     new URL(
       `/tenants?connected=${encodeURIComponent(tenantRecordId || "")}&readyToSync=${
         automaticMonitoringAvailable === true ? "1" : "0"
-      }&permissionPending=${automaticMonitoringAvailable === null ? "1" : "0"}`,
+      }&permissionPending=${automaticMonitoringAvailable === null || validationDeferred ? "1" : "0"}`,
       req.url
     )
   );
