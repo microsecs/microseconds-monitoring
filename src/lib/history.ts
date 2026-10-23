@@ -242,12 +242,36 @@ export async function getRecentHistoryPage(opts:{
     for (const x of intel || []) intelMap.set(String(x.ip_address), x);
   }
 
+  // Microsoft Graph can omit userPrincipalName for individual events.
+  // Recover it only from a uniquely matching display name in the same tenant,
+  // never by guessing an email address or borrowing identity across tenants.
+  const identityMap=new Map<string,Set<string>>();
+  const identityKey=(s:any)=>[s.microsoft_tenant_id||s.google_workspace_tenant_id||"",String(s.user_display_name||"").trim().toLowerCase()].join("|");
+  const missingNames=Array.from(new Set(signins.filter((s:any)=>!s.user_principal_name&&s.user_display_name).map((s:any)=>String(s.user_display_name))));
+  if(missingNames.length){
+    for(let i=0;i<missingNames.length;i+=20){
+      const {data:known,error:knownError}=await supabase.from("signins")
+        .select("microsoft_tenant_id,google_workspace_tenant_id,user_display_name,user_principal_name")
+        .eq("organization_id",org.id).in("user_display_name",missingNames.slice(i,i+20))
+        .not("user_principal_name","is",null).limit(2000);
+      if(knownError){console.warn("[signins] identity fallback unavailable",knownError.message);break;}
+      for(const knownRow of known||[]){
+        const email=String(knownRow.user_principal_name||"").trim();
+        if(!email.includes("@"))continue;
+        const key=identityKey(knownRow);
+        if(!identityMap.has(key))identityMap.set(key,new Set());
+        identityMap.get(key)!.add(email);
+      }
+    }
+  }
   const rows=signins.map((s: any) => {
     const intel = s.ip_address ? intelMap.get(String(s.ip_address)) : null;
     const { incident: _incidentRelation, ...signinFields } = s;
 
     return {
       ...signinFields,
+      user_principal_name:s.user_principal_name ||
+        (identityMap.get(identityKey(s))?.size===1?[...identityMap.get(identityKey(s))!][0]:null),
       tenant_name: s.google_workspace_tenant_id
         ? googleTenantMap.get(s.google_workspace_tenant_id) || "Google Workspace"
         : s.microsoft_tenant_id

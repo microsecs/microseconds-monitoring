@@ -25,13 +25,16 @@ export default function NavigationProgress() {
       if (url.origin !== window.location.origin) return;
       if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash === window.location.hash) return;
       if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+      // Sign-in History already has a route-level loading boundary. Avoid a
+      // second persistent global panel that can cover the rendered sign-in list.
+      if (url.pathname === "/signins") return;
       setLoading(true);
     };
     document.addEventListener("click", click, true);
     return () => document.removeEventListener("click", click, true);
   }, []);
 
-  if (!loading) return null;
+  if (!loading || pathname === "/signins") return null;
   return (
     <div className="navigationLoadingPanel" aria-label="Loading page">
       <PageLoading />
