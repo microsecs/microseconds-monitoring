@@ -282,3 +282,9 @@ body{min-height:100vh}
 .legalPage .legalEffective{color:#94a3b8;margin-bottom:26px}
 .legalPage a{color:#93c5fd}
 @media(max-width:640px){.siteFooter{justify-content:center;gap:6px 12px}.siteFooter span,.siteFooter a{width:auto;text-align:center}.footerDot{display:inline}.legalPage{padding:20px}}
+
+/* Connection states use the same unboxed typography as Connection healthy. */
+.tenantHealth{margin-top:6px}
+.tenantStatusText{display:inline;color:inherit;font-size:11px;font-weight:700;line-height:normal;background:none;border:0;border-radius:0;padding:0;box-shadow:none}
+.tenantStatusDelayed{color:#fde68a}
+.tenantStatusProblem{color:#fca5a5}

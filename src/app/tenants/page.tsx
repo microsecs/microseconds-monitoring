@@ -49,13 +49,12 @@ function isTemporaryFailure(error?:string|null){
  return ["throttl","retry-after","too many requests","429","timeout","timed out","aborted"].some(x=>low.includes(x));
 }
 function healthBadge(status?: string | null, error?: string | null) {
-  if(status==="delayed" || (status==="problem" && isTemporaryFailure(error))) return <span className="pill syncDelayed">Sync Delayed</span>;
-  if (status === "reconnect_required") return <span className="pill connectionProblem">Reconnection Required</span>;
-  if (status === "problem") {
-    const low = String(error || "").toLowerCase();
-    if (low.includes("timeout") || low.includes("aborted")) return <span className="pill syncDelayed">Sync Delayed</span>;
-    return <span className="pill connectionProblem">Connection Problem</span>;
-  }
+  if (status === "delayed" || (status === "problem" && isTemporaryFailure(error)))
+    return <span className="tenantStatusText tenantStatusDelayed">Sync Delayed</span>;
+  if (status === "reconnect_required")
+    return <span className="tenantStatusText tenantStatusProblem">Reconnection Required</span>;
+  if (status === "problem")
+    return <span className="tenantStatusText tenantStatusProblem">Connection Problem</span>;
   return null;
 }
 
