@@ -9,6 +9,10 @@ function table(provider: HealthProvider) {
 function platform(provider: HealthProvider) {
   return provider === "google" ? "Google Workspace" : "Microsoft 365";
 }
+export function isTemporaryMonitoringFailure(message:string){
+ const s=String(message||"").toLowerCase();
+ return ["throttl","retry-after","too many requests","429","timeout","timed out","aborted"].some(x=>s.includes(x));
+}
 function reconnectRequired(message: string) {
   const s = String(message || "").toLowerCase();
   return [
@@ -37,7 +41,7 @@ export async function recordMonitoringFailure(params:{
 }) {
   const db=getSupabaseAdmin();
   const message=params.error instanceof Error ? params.error.message : String(params.error || "Automatic monitoring failed");
-  const status=reconnectRequired(message) ? "reconnect_required" : "problem";
+  const status=isTemporaryMonitoringFailure(message) ? "delayed" : reconnectRequired(message) ? "reconnect_required" : "problem";
   const {data:existing}=await db.from(table(params.provider))
     .select("health_alert_sent_at").eq("id",params.tenantId).maybeSingle();
 
@@ -48,7 +52,7 @@ export async function recordMonitoringFailure(params:{
 
   // Manual Sync Now records health but never sends email. Automatic monitoring alerts only once
   // per outage; a later successful sync clears health_alert_sent_at so a future outage can alert again.
-  if(!params.sendAlert || existing?.health_alert_sent_at) return {status,alerted:0};
+  if(status==="delayed" || !params.sendAlert || existing?.health_alert_sent_at) return {status,alerted:0};
 
   const settings=await getOrganizationNotificationSettings(params.organizationId);
   const recipients=Array.from(new Set((settings.alert_emails||[]).map(x=>String(x).trim().toLowerCase()).filter(Boolean)));

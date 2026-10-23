@@ -44,7 +44,12 @@ function monitoringLabel(t: Tenant, globalMonitoring: boolean) {
 }
 
 
+function isTemporaryFailure(error?:string|null){
+ const low=String(error||"").toLowerCase();
+ return ["throttl","retry-after","too many requests","429","timeout","timed out","aborted"].some(x=>low.includes(x));
+}
 function healthBadge(status?: string | null, error?: string | null) {
+  if(status==="delayed" || (status==="problem" && isTemporaryFailure(error))) return <span className="pill syncDelayed">Sync Delayed</span>;
   if (status === "reconnect_required") return <span className="pill connectionProblem">Reconnection Required</span>;
   if (status === "problem") {
     const low = String(error || "").toLowerCase();
@@ -459,8 +464,8 @@ export default function TenantsPage() {
   const totalTenants = tenants.length + googleTenants.length;
   const automaticTenants = tenants.filter((t) => t.automatic_monitoring_available === true).length + googleTenants.length;
   const csvTenants = tenants.filter((t) => t.automatic_monitoring_available !== true).length;
-  const attentionTenants = tenants.filter((t) => t.connection_status === "problem" || t.connection_status === "reconnect_required").length
-    + googleTenants.filter((g) => g.connection_status === "problem" || g.connection_status === "reconnect_required").length;
+  const attentionTenants = tenants.filter((t) => t.connection_status === "reconnect_required" || (t.connection_status === "problem" && !isTemporaryFailure(t.last_sync_error))).length
+    + googleTenants.filter((g) => g.connection_status === "reconnect_required" || (g.connection_status === "problem" && !isTemporaryFailure(g.last_sync_error))).length;
   const canSyncAll = automaticTenants > 0;
 
   const csvMicrosoftTenants = tenants.filter(
@@ -649,7 +654,7 @@ export default function TenantsPage() {
                     <td style={{ minWidth: 210 }}>
                       <div className="tenantName">{t.tenant_name || "Unnamed tenant"}</div>
                       {healthBadge(t.connection_status, t.last_sync_error) ? <div className="tenantHealth">{healthBadge(t.connection_status, t.last_sync_error)}</div> : <div className="tenantHealthy">Connection healthy</div>}
-                      {(t.connection_status === "reconnect_required" || t.connection_status === "problem") ? (
+                      {(t.connection_status === "reconnect_required" || (t.connection_status === "problem" && !isTemporaryFailure(t.last_sync_error))) ? (
                         <div><a className="tenantReconnectLink" href="/api/microsoft/connect">Reconnect Microsoft 365</a></div>
                       ) : null}
                     </td>
@@ -713,7 +718,7 @@ export default function TenantsPage() {
                   <td style={{ minWidth: 210 }}>
                     <div className="tenantName">{g.display_name}</div>
                     {healthBadge(g.connection_status, g.last_sync_error) ? <div className="tenantHealth">{healthBadge(g.connection_status, g.last_sync_error)}</div> : <div className="tenantHealthy">Connection healthy</div>}
-                    {(g.connection_status === "reconnect_required" || g.connection_status === "problem") ? (
+                    {(g.connection_status === "reconnect_required" || (g.connection_status === "problem" && !isTemporaryFailure(g.last_sync_error))) ? (
                       <div><a className="tenantReconnectLink" href="/api/google/connect" title="Renew Google Workspace authorization without deleting historical data">Reconnect Google Workspace</a></div>
                     ) : null}
                   </td>
