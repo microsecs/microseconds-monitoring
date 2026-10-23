@@ -270,3 +270,15 @@ body{min-height:100vh}
   overflow: auto;
 }
 .navigationLoadingPanel .pageLoadingPanel { width: 100%; }
+
+/* Compact footer consistent with the MicroSECONDS training application. */
+.siteFooter{justify-content:flex-start;gap:15px;padding:16px 20px;background:#030817;color:#a5b4ce;border-top:1px solid #1c2841;font-size:13px}
+.siteFooter a{font-weight:400;color:#a5b4ce;text-decoration:none}
+.siteFooter a:hover{text-decoration:underline;color:#fff}
+.legalPage{max-width:900px;margin:10px auto 50px;padding:28px 34px;line-height:1.7}
+.legalPage h1{font-size:30px;margin:0 0 4px}
+.legalPage h2{font-size:18px;margin:26px 0 7px}
+.legalPage p,.legalPage li{color:#cbd5e1}
+.legalPage .legalEffective{color:#94a3b8;margin-bottom:26px}
+.legalPage a{color:#93c5fd}
+@media(max-width:640px){.siteFooter{justify-content:center;gap:6px 12px}.siteFooter span,.siteFooter a{width:auto;text-align:center}.footerDot{display:inline}.legalPage{padding:20px}}

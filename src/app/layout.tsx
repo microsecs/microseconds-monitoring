@@ -55,13 +55,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <main className="main">{children}</main>
           {user && (
             <footer className="siteFooter">
-              <span>© {new Date().getFullYear()} MicroSECONDS Computer Consulting. All rights reserved.</span>
+              <span>© {new Date().getFullYear()} MicroSECONDS Computer Consulting</span>
               <span className="footerDot">·</span>
               <span>MicroSECONDS Monitoring</span>
               <span className="footerDot">·</span>
-              <Link href="/support">Support</Link>
+              <Link href="/terms">Terms</Link>
               <span className="footerDot">·</span>
-              <a href="https://microseconds.com" target="_blank" rel="noopener noreferrer">MicroSECONDS.com</a>
+              <Link href="/privacy">Privacy</Link>
             </footer>
           )}
         </div>
