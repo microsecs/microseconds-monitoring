@@ -26,7 +26,7 @@ function Range({value,min,max,step=1,onChange}:{value:number;min:number;max:numb
 }
 
 export default function CombinedSecuritySettings({showPageHeader=false}:{showPageHeader?:boolean}){
- const [criteria,setCriteria]=useState<any>(null),[defaults,setDefaults]=useState<any>(null),[notify,setNotify]=useState<any>(null),[monitoring,setMonitoring]=useState<boolean|null>(null);
+ const [criteria,setCriteria]=useState<any>(null),[defaults,setDefaults]=useState<any>(null),[notify,setNotify]=useState<any>(null),[monitoring,setMonitoring]=useState<boolean|null>(null),[intervalHours,setIntervalHours]=useState(3);
  const [msg,setMsg]=useState(""),[err,setErr]=useState(""),[saving,setSaving]=useState(false);
  const c=(k:string,v:any)=>setCriteria((x:any)=>({...x,[k]:v}));
  const n=(k:string,v:any)=>setNotify((x:any)=>({...x,[k]:v}));
@@ -35,7 +35,7 @@ export default function CombinedSecuritySettings({showPageHeader=false}:{showPag
   fetch("/api/settings/incident-criteria",{cache:"no-store"}).then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error);return j;}),
   fetch("/api/notifications",{cache:"no-store"}).then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error);return j;}),
   fetch("/api/settings/automatic-monitoring",{cache:"no-store"}).then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error);return j;})
- ]).then(([a,b,m])=>{setCriteria(a.settings);setDefaults(a.defaults);setNotify(b.settings);setMonitoring(m.enabled===true);}).catch(e=>setErr(e.message));},[]);
+ ]).then(([a,b,m])=>{setCriteria(a.settings);setDefaults(a.defaults);setNotify(b.settings);setMonitoring(m.enabled===true);setIntervalHours(m.intervalHours||3);}).catch(e=>setErr(e.message));},[]);
 
  async function save(){
   if(!criteria||!notify||monitoring===null)return;
@@ -50,11 +50,11 @@ export default function CombinedSecuritySettings({showPageHeader=false}:{showPag
      immediateCritical:notify.immediate_critical,hourlyDigestReview:notify.hourly_digest_review,
      notificationTimeZone:notify.notification_time_zone||"America/Los_Angeles"
     })}),
-    fetch("/api/settings/automatic-monitoring",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:monitoring})})
+    fetch("/api/settings/automatic-monitoring",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:monitoring,intervalHours})})
    ]);
    const aj=await a.json(),bj=await b.json(),mj=await m.json();
    if(!a.ok)throw new Error(aj.error);if(!b.ok)throw new Error(bj.error);if(!m.ok)throw new Error(mj.error);
-   setCriteria(aj.settings);setNotify(bj.settings);setMonitoring(mj.enabled===true);setMsg("Settings saved.");
+   setCriteria(aj.settings);setNotify(bj.settings);setMonitoring(mj.enabled===true);setIntervalHours(mj.intervalHours||3);setMsg("Settings saved.");
   }catch(e:any){setErr(e.message)}finally{setSaving(false)}
  }
 
@@ -76,6 +76,13 @@ export default function CombinedSecuritySettings({showPageHeader=false}:{showPag
      <strong>{monitoring?"On":"Off"}</strong>
      <Toggle checked={monitoring} onChange={setMonitoring} label="Automatic monitoring"/>
     </div>
+   </div>
+   <div style={{marginTop:16,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+    <label htmlFor="monitoring-interval"><strong>Monitoring frequency</strong></label>
+    <select id="monitoring-interval" className="select" value={intervalHours} onChange={e=>setIntervalHours(Number(e.target.value))} disabled={!monitoring}>
+     {[1,3,6,12].map(h=><option key={h} value={h}>Every {h} {h===1?"hour":"hours"}</option>)}
+    </select>
+    <span className="subtitle">Default: every 3 hours. Tenants are staggered to reduce provider throttling.</span>
    </div>
    <div className="subtitle" style={{marginTop:12}}>When enabled, scheduled monitoring syncs eligible tenants, analyzes new successful sign-ins, creates incidents using your risk settings, and sends enabled email alerts. CSV-only tenants are ignored. Manual Sync and Sync All do not send email alerts.</div>
   </div>

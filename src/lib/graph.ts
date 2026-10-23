@@ -63,25 +63,38 @@ function graphOperation(url: string) {
   return "Microsoft Graph request";
 }
 
+function retryAfterMs(value:string|null,attempt:number){
+  if(value){
+    const seconds=Number(value);
+    if(Number.isFinite(seconds)&&seconds>=0)return seconds*1000;
+    const date=Date.parse(value);
+    if(Number.isFinite(date))return Math.max(0,date-Date.now());
+  }
+  return Math.min(60000,1000*Math.pow(2,attempt))+Math.floor(Math.random()*500);
+}
 async function graphGet(accessToken: string, url: string) {
   const operation = graphOperation(url);
   const startedAt = Date.now();
   try {
-    const res = await providerFetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-    }, operation);
-
-    const data = await res.json();
-
-    if (!res.ok) {
+    for(let attempt=0;attempt<3;attempt++){
+      const res = await providerFetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: "no-store",
+      }, operation);
+      const data = await res.json();
+      if(res.ok)return data;
       const code = data?.error?.code ? `${data.error.code}: ` : "";
-      const message =
-        data?.error?.message || `Microsoft Graph request failed (${res.status}).`;
-      throw new Error(`${code}${message}`);
+      const message = data?.error?.message || `Microsoft Graph request failed (${res.status}).`;
+      if((res.status===429||res.status===503||res.status===504)&&attempt<2){
+        const delay=retryAfterMs(res.headers.get("retry-after"),attempt);
+        if(delay<=15000){
+          await new Promise(resolve=>setTimeout(resolve,delay));
+          continue;
+        }
+      }
+      throw new Error(`${code}${message}${res.status===429?` (throttled; Retry-After: ${res.headers.get("retry-after")||"not provided"})`:""}`);
     }
-
-    return data;
+    throw new Error("Microsoft Graph retries exhausted");
   } catch (error: any) {
     console.error(`[microsoft-graph] ${operation} failed after ${Date.now() - startedAt}ms: ${error?.message || error}`);
     throw error;

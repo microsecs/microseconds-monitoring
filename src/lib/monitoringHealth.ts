@@ -24,9 +24,11 @@ function esc(v: unknown) {
 
 export async function markMonitoringHealthy(provider: HealthProvider, tenantId: string) {
   const db=getSupabaseAdmin();
-  await db.from(table(provider)).update({
+  const {data,error}=await db.from(table(provider)).update({
     connection_status:"healthy", last_sync_error:null, last_sync_error_at:null, health_alert_sent_at:null
-  }).eq("id",tenantId);
+  }).eq("id",tenantId).select("id").maybeSingle();
+  if(error) throw new Error(`Could not clear ${provider} connection warning: ${error.message}`);
+  if(!data) throw new Error(`Could not clear ${provider} connection warning: tenant not found`);
 }
 
 export async function recordMonitoringFailure(params:{
@@ -39,9 +41,10 @@ export async function recordMonitoringFailure(params:{
   const {data:existing}=await db.from(table(params.provider))
     .select("health_alert_sent_at").eq("id",params.tenantId).maybeSingle();
 
-  await db.from(table(params.provider)).update({
+  const {error:updateError}=await db.from(table(params.provider)).update({
     connection_status:status,last_sync_error:message.slice(0,2000),last_sync_error_at:new Date().toISOString()
   }).eq("id",params.tenantId);
+  if(updateError) throw updateError;
 
   // Manual Sync Now records health but never sends email. Automatic monitoring alerts only once
   // per outage; a later successful sync clears health_alert_sent_at so a future outage can alert again.
