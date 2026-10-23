@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { cookies } from "next/headers";
 import NavigationProgress from "@/components/NavigationProgress";
+import ScrollToTopOnRoute from "@/components/ScrollToTopOnRoute";
 import IncidentsNavLink from "@/components/IncidentsNavLink";
 import AuthControls from "@/components/AuthControls";
 import ProductAdminNavLink from "@/components/ProductAdminNavLink";
@@ -32,6 +33,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body>
         {user && <Suspense fallback={null}><NavigationProgress /></Suspense>}
+        <ScrollToTopOnRoute />
         {user && (
           <header className="siteHeader">
             <Link href="/tenants" className="headerBrand" aria-label="MicroSECONDS Monitoring">
