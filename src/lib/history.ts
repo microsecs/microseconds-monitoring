@@ -90,7 +90,7 @@ export async function getRecentHistoryPage(opts:{
   let query = supabase
     .from("signins")
     .select(
-       "id,microsoft_tenant_id,google_workspace_tenant_id,source_platform,source,event_time,user_principal_name,user_display_name,ip_address,city,region,country,app_name,status,failure_reason,microsoft_risk,incident:security_incidents(risk_score,reasons,ai_recommended_risk_score,ai_summary,ai_classification)",
+       "id,microsoft_tenant_id,google_workspace_tenant_id,source_platform,source,event_time,user_principal_name,user_display_name,raw,ip_address,city,region,country,app_name,status,failure_reason,microsoft_risk,incident:security_incidents(risk_score,reasons,ai_recommended_risk_score,ai_summary,ai_classification)",
        {count:"exact"}
     )
     .eq("organization_id", org.id)
@@ -242,36 +242,53 @@ export async function getRecentHistoryPage(opts:{
     for (const x of intel || []) intelMap.set(String(x.ip_address), x);
   }
 
-  // Microsoft Graph can omit userPrincipalName for individual events.
-  // Recover it only from a uniquely matching display name in the same tenant,
-  // never by guessing an email address or borrowing identity across tenants.
+  // Recover missing identities from previously recorded Microsoft Graph user IDs,
+  // then from uniquely matching names within the SAME tenant. Never infer an
+  // email from the tenant domain or match a display name across organizations.
   const identityMap=new Map<string,Set<string>>();
-  const identityKey=(s:any)=>[s.microsoft_tenant_id||s.google_workspace_tenant_id||"",String(s.user_display_name||"").trim().toLowerCase()].join("|");
-  const missingNames=Array.from(new Set(signins.filter((s:any)=>!s.user_principal_name&&s.user_display_name).map((s:any)=>String(s.user_display_name))));
-  if(missingNames.length){
-    for(let i=0;i<missingNames.length;i+=20){
-      const {data:known,error:knownError}=await supabase.from("signins")
-        .select("microsoft_tenant_id,google_workspace_tenant_id,user_display_name,user_principal_name")
-        .eq("organization_id",org.id).in("user_display_name",missingNames.slice(i,i+20))
-        .not("user_principal_name","is",null).limit(2000);
-      if(knownError){console.warn("[signins] identity fallback unavailable",knownError.message);break;}
-      for(const knownRow of known||[]){
-        const email=String(knownRow.user_principal_name||"").trim();
+  const idMap=new Map<string,Set<string>>();
+  const norm=(v:unknown)=>String(v||"").trim().toLowerCase();
+  const identityKey=(row:any)=>[row.microsoft_tenant_id||row.google_workspace_tenant_id||"",norm(row.user_display_name)].join("|");
+  const userKey=(row:any)=>[row.microsoft_tenant_id||row.google_workspace_tenant_id||"",norm(row.raw?.userId)].join("|");
+  const missing=signins.filter((row:any)=>!norm(row.user_principal_name).includes("@"));
+  if(missing.length){
+    const tenantSet=new Set(missing.map((row:any)=>row.microsoft_tenant_id||row.google_workspace_tenant_id).filter(Boolean));
+    for(const tenantId of tenantSet){
+      const isMicrosoft=missing.some((row:any)=>row.microsoft_tenant_id===tenantId);
+      let query=supabase.from("signins")
+        .select("microsoft_tenant_id,google_workspace_tenant_id,user_display_name,user_principal_name,raw")
+        .eq("organization_id",org.id)
+        .not("user_principal_name","is",null)
+        .order("event_time",{ascending:false}).limit(2000);
+      query=isMicrosoft?query.eq("microsoft_tenant_id",tenantId):query.eq("google_workspace_tenant_id",tenantId);
+      const {data:known,error:knownError}=await query;
+      if(knownError){console.warn("[signins] identity lookup unavailable",knownError.message);continue;}
+      for(const row of known||[]){
+        const email=String(row.user_principal_name||"").trim();
         if(!email.includes("@"))continue;
-        const key=identityKey(knownRow);
-        if(!identityMap.has(key))identityMap.set(key,new Set());
-        identityMap.get(key)!.add(email);
+        const byName=identityKey(row);
+        if(norm(row.user_display_name)){
+          if(!identityMap.has(byName))identityMap.set(byName,new Set());
+          identityMap.get(byName)!.add(email);
+        }
+        if(norm(row.raw?.userId)){
+          const byId=userKey(row);
+          if(!idMap.has(byId))idMap.set(byId,new Set());
+          idMap.get(byId)!.add(email);
+        }
       }
     }
   }
+  const unique=(values?:Set<string>)=>values?.size===1?[...values][0]:null;
   const rows=signins.map((s: any) => {
     const intel = s.ip_address ? intelMap.get(String(s.ip_address)) : null;
     const { incident: _incidentRelation, ...signinFields } = s;
 
     return {
       ...signinFields,
-      user_principal_name:s.user_principal_name ||
-        (identityMap.get(identityKey(s))?.size===1?[...identityMap.get(identityKey(s))!][0]:null),
+      raw:undefined,
+      user_principal_name:norm(s.user_principal_name).includes("@") ? s.user_principal_name :
+        unique(idMap.get(userKey(s))) || unique(identityMap.get(identityKey(s))) || s.user_principal_name,
       tenant_name: s.google_workspace_tenant_id
         ? googleTenantMap.get(s.google_workspace_tenant_id) || "Google Workspace"
         : s.microsoft_tenant_id
