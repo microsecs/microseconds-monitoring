@@ -77,12 +77,19 @@ export default function CombinedSecuritySettings({showPageHeader=false}:{showPag
      <Toggle checked={monitoring} onChange={setMonitoring} label="Automatic monitoring"/>
     </div>
    </div>
-   <div style={{marginTop:16,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
-    <label htmlFor="monitoring-interval"><strong>Monitoring frequency</strong></label>
-    <select id="monitoring-interval" className="select" value={intervalHours} onChange={e=>setIntervalHours(Number(e.target.value))} disabled={!monitoring}>
-     {[1,3,6,12].map(h=><option key={h} value={h}>Every {h} {h===1?"hour":"hours"}</option>)}
-    </select>
-    <span className="subtitle">Default: every 3 hours. Tenants are staggered to reduce provider throttling.</span>
+   <div style={{marginTop:20,opacity:monitoring?1:.5}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:12}}>
+     <label htmlFor="monitoring-interval"><strong>Monitoring frequency</strong></label>
+     <strong style={{fontSize:22}}>Every {intervalHours} {intervalHours===1?"hour":"hours"}</strong>
+    </div>
+    <input id="monitoring-interval" type="range" min={0} max={3} step={1}
+     value={[1,3,6,12].indexOf(intervalHours)}
+     onChange={e=>setIntervalHours([1,3,6,12][Number(e.target.value)])}
+     disabled={!monitoring} style={{width:"100%"}} aria-valuetext={`Every ${intervalHours} hours`}/>
+    <div className="subtitle" style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+     {[1,3,6,12].map(h=><span key={h}>{h}h</span>)}
+    </div>
+    <div className="subtitle" style={{marginTop:8}}>Default: 3 hours. Tenants are staggered to reduce provider throttling.</div>
    </div>
    <div className="subtitle" style={{marginTop:12}}>When enabled, scheduled monitoring syncs eligible tenants, analyzes new successful sign-ins, creates incidents using your risk settings, and sends enabled email alerts. CSV-only tenants are ignored. Manual Sync and Sync All do not send email alerts.</div>
   </div>

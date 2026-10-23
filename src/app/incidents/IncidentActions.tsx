@@ -9,7 +9,7 @@ export default function IncidentActions({incidentId,currentStatus,resolution}:{i
   try{const r=await fetch(`/api/incidents/${incidentId}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({resolution:action})});
    const j=await r.json();if(!r.ok)throw new Error(j?.error||"Could not resolve incident.");
    const label=action==="marked_safe"?"marked safe":action==="confirmed_suspicious"?"confirmed suspicious":"dismissed";
-   const message=`Incident ${label}.`;sessionStorage.setItem("microseconds:incident-status",message);window.dispatchEvent(new CustomEvent("microseconds:incident-status",{detail:{message}}));window.dispatchEvent(new Event("microseconds:incidents-changed"));router.refresh();
+   const message=`Incident ${label}.`;window.dispatchEvent(new CustomEvent("microseconds:incident-status",{detail:{message}}));window.dispatchEvent(new Event("microseconds:incidents-changed"));router.refresh();
   }catch(e:any){setError(e?.message||"Could not resolve incident.");}finally{setBusy(null);window.dispatchEvent(new Event("microseconds:incident-working-done"));}
  }
  if(currentStatus==="dismissed")return <div style={{marginTop:20}}><div className="subtitle">Resolution: {String(resolution||"dismissed").replaceAll("_"," ")}</div></div>;

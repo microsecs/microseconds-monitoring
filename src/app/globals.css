@@ -155,7 +155,7 @@ button:disabled .spinner{opacity:.9}
 body{min-height:100vh}
 .appShell{min-height:calc(100vh - 64px);display:flex;flex-direction:column}
 .appShell .main{flex:1}
-.siteFooter{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;margin-top:auto;padding:16px 22px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.4}
+.siteFooter{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:auto;padding:22px 24px;border-top:1px solid var(--line);background:rgba(8,15,28,.45);color:var(--muted);font-size:12px;line-height:1.5}
 .siteFooter a{color:#cbd5e1;font-weight:600}
 .siteFooter a:hover{color:#fff;text-decoration:underline}
 .footerDot{color:#64748b}

@@ -1,19 +1,11 @@
 "use client";
 import {useEffect,useState} from "react";
 
-const STORAGE_KEY="microseconds:incident-status";
-
 export default function IncidentStatusPopup(){
   const [message,setMessage]=useState("");
   const [working,setWorking]=useState("");
 
   useEffect(()=>{
-    const stored=sessionStorage.getItem(STORAGE_KEY);
-    if(stored){
-      sessionStorage.removeItem(STORAGE_KEY);
-      setMessage(stored);
-    }
-
     const onStatus=(event:Event)=>{
       const detail=(event as CustomEvent<{message?:string}>).detail;
       if(detail?.message)setMessage(detail.message);
