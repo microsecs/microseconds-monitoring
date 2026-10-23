@@ -649,7 +649,7 @@ export default function TenantsPage() {
                     <td style={{ minWidth: 210 }}>
                       <div className="tenantName">{t.tenant_name || "Unnamed tenant"}</div>
                       {healthBadge(t.connection_status, t.last_sync_error) ? <div className="tenantHealth">{healthBadge(t.connection_status, t.last_sync_error)}</div> : <div className="tenantHealthy">Connection healthy</div>}
-                      {t.connection_status === "reconnect_required" ? (
+                      {(t.connection_status === "reconnect_required" || t.connection_status === "problem") ? (
                         <div><a className="tenantReconnectLink" href="/api/microsoft/connect">Reconnect Microsoft 365</a></div>
                       ) : null}
                     </td>
@@ -713,7 +713,7 @@ export default function TenantsPage() {
                   <td style={{ minWidth: 210 }}>
                     <div className="tenantName">{g.display_name}</div>
                     {healthBadge(g.connection_status, g.last_sync_error) ? <div className="tenantHealth">{healthBadge(g.connection_status, g.last_sync_error)}</div> : <div className="tenantHealthy">Connection healthy</div>}
-                    {g.connection_status === "reconnect_required" ? (
+                    {(g.connection_status === "reconnect_required" || g.connection_status === "problem") ? (
                       <div><a className="tenantReconnectLink" href="/api/google/connect" title="Renew Google Workspace authorization without deleting historical data">Reconnect Google Workspace</a></div>
                     ) : null}
                   </td>
