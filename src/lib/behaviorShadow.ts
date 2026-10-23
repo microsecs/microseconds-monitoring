@@ -1,14 +1,17 @@
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
-/** Shadow-only scoring. Never changes live score, incidents, alerts or thresholds. */
-/** Controlled live rollout: explicit organization allowlist and activation timestamp.
- * Both variables are required; existing/historical sign-ins are never retroactively promoted.
+/** Live behavioral scoring is enabled for every organization after rollout begins.
+ * Explicit opt-out and a global kill switch support safe rollback.
+ * Never apply the feature retroactively to historical sign-ins.
  */
 export function behavioralLiveEnabled(organizationId:string,eventTime:string){
- const ids=(process.env.BEHAVIORAL_LIVE_ROLLOUT_ORG_IDS||"").split(",").map(x=>x.trim()).filter(Boolean);
- const started=Date.parse(process.env.BEHAVIORAL_LIVE_ROLLOUT_STARTED_AT||"");
+ if(process.env.BEHAVIORAL_LIVE_DISABLED==="true")return false;
+ const excluded=(process.env.BEHAVIORAL_LIVE_EXCLUDED_ORG_IDS||"").split(",").map(x=>x.trim()).filter(Boolean);
+ if(excluded.includes(organizationId))return false;
+ // Conservative deployment boundary; optional environment override for future rollouts.
+ const started=Date.parse(process.env.BEHAVIORAL_LIVE_ROLLOUT_STARTED_AT||"2026-10-24T00:00:00Z");
  const event=Date.parse(eventTime);
- return ids.includes(organizationId)&&Number.isFinite(started)&&Number.isFinite(event)&&event>=started;
+ return Number.isFinite(started)&&Number.isFinite(event)&&event>=started;
 }
 
 export function calculateBehavioralAdjustment(input:{

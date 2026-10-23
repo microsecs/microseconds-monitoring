@@ -1,22 +1,23 @@
-# Behavioral learning — controlled live rollout
+# Behavioral learning — all-organization activation
 
-The conservative October 17 behavioral scoring algorithm is available for live incidents behind a two-part, **default-off** Vercel environment gate.
+Live conservative behavioral scoring is enabled for **all organizations** by default for sign-ins dated **October 24, 2026 00:00 UTC or later**. The activation boundary prevents older imported sign-ins from being promoted retroactively.
 
-Configure both production environment variables:
-- `BEHAVIORAL_LIVE_ROLLOUT_ORG_IDS`: comma-separated **internal organizations.id UUIDs** explicitly approved for the pilot (not external Microsoft tenant IDs). Start with one organization.
-- `BEHAVIORAL_LIVE_ROLLOUT_STARTED_AT`: UTC ISO-8601 timestamp at or after the activation time, e.g. `2026-10-23T22:00:00Z`. This prevents previously imported sign-ins from creating new incidents retroactively.
-
-Redeploy after setting these variables. Until **both** are set, no behavioral adjustment affects live scoring.
+Each user's behavioral history is scoped to their own organization, provider, tenant, and user. No cross-customer baseline sharing occurs.
 
 Safeguards:
-- The algorithm is shared with shadow telemetry and requires >=10 prior successful sign-ins in the preceding 90 days.
-- A single unfamiliar IP, country, or application contributes zero points.
-- A new IP and country contributes +8; an additional new application contributes +4; a new IP and application alone contributes +4.
-- Matching verified-safe feedback suppresses novelty increases unless conflicting suspicious feedback exists.
-- No behavioral trust reduction, incident dismissal, alert suppression, or changes to incident thresholds.
-- The original pre-behavior score remains recorded in `behavior_shadow_assessments.live_score` for comparison; existing incident records are not re-scored.
-- If behavioral evaluation fails, normal incident scoring proceeds without behavioral adjustments.
+- At least 10 prior successful sign-ins within 90 days before behavioral novelty adjustments.
+- A single unfamiliar attribute does not increase risk.
+- New IP + country: +8; add an unfamiliar application: +4 more (maximum +12).
+- New IP + application without a country change: +4.
+- Verified-safe matching feedback prevents novelty increases unless conflicting confirmed-suspicious feedback exists.
+- No automatic incident dismissal, risk reductions from familiarity, or alert suppression.
+- Shadow assessments remain active and record the original pre-behavior score.
+- Failure to evaluate behavior leaves existing risk scoring intact.
 
-To disable immediately, remove the organization UUID from `BEHAVIORAL_LIVE_ROLLOUT_ORG_IDS` (or clear it), and redeploy. Existing incidents are not deleted or modified.
+## Controls
 
-Monitor Product Admin → Behavioral Learning, review verified Safe / Confirm Suspicious outcomes and threshold crossings, and expand the allowlist only after pilot results are satisfactory.
+- `BEHAVIORAL_LIVE_DISABLED=true`: global emergency stop (redeploy after changing Vercel environment variables).
+- `BEHAVIORAL_LIVE_EXCLUDED_ORG_IDS`: comma-separated internal organization UUIDs to exclude (redeploy).
+- `BEHAVIORAL_LIVE_ROLLOUT_STARTED_AT`: optional ISO UTC activation time override; defaults to `2026-10-24T00:00:00Z`.
+
+No allowlist or new Supabase migration is required. Previously created incidents are not rescored. Review Product Admin → Behavioral Learning regularly.
