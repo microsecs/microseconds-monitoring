@@ -1,6 +1,67 @@
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 /** Shadow-only scoring. Never changes live score, incidents, alerts or thresholds. */
+/** Controlled live rollout: explicit organization allowlist and activation timestamp.
+ * Both variables are required; existing/historical sign-ins are never retroactively promoted.
+ */
+export function behavioralLiveEnabled(organizationId:string,eventTime:string){
+ const ids=(process.env.BEHAVIORAL_LIVE_ROLLOUT_ORG_IDS||"").split(",").map(x=>x.trim()).filter(Boolean);
+ const started=Date.parse(process.env.BEHAVIORAL_LIVE_ROLLOUT_STARTED_AT||"");
+ const event=Date.parse(eventTime);
+ return ids.includes(organizationId)&&Number.isFinite(started)&&Number.isFinite(event)&&event>=started;
+}
+
+export function calculateBehavioralAdjustment(input:{
+ history:Array<{ip_address?:string|null;country?:string|null;app_name?:string|null}>;
+ ip?:string|null;country?:string|null;application?:string|null;
+ feedbackSafeAdjustment:number;feedbackSuspiciousAdjustment:number;
+}){
+ const norm=(v?:string|null)=>String(v||"").trim().toLowerCase();
+ const unseen=(field:"ip_address"|"country"|"app_name",value?:string|null)=>
+  !!norm(value)&&!input.history.some(r=>norm(r[field])===norm(value));
+ const newIp=unseen("ip_address",input.ip);
+ const newCountry=unseen("country",input.country);
+ const newApp=unseen("app_name",input.application);
+ const mature=input.history.length>=10;
+ const verifiedSafe=input.feedbackSafeAdjustment>0;
+ const verifiedSuspicious=input.feedbackSuspiciousAdjustment>0;
+ const reasons:string[]=[];
+ let adjustment=0;
+ if(!mature)reasons.push("Insufficient prior observations for behavioral risk adjustment (minimum 10)");
+ else if(verifiedSafe&&!verifiedSuspicious)reasons.push("Matching verified-safe feedback: no novelty-based shadow increase");
+ else if(newIp&&newCountry){
+  adjustment=8;
+  reasons.push("Unseen IP and country together in established user history (+8)");
+  if(newApp){adjustment+=4;reasons.push("Unseen application alongside IP and country change (+4)");}
+ }else if(newIp&&newApp){
+  adjustment=4;
+  reasons.push("Unseen IP and application together in established user history (+4)");
+ }else if(newIp||newCountry||newApp){
+  reasons.push("Single unfamiliar attribute observed; no standalone behavioral risk increase");
+ }
+ return {adjustment:Math.min(12,adjustment),reasons,newIp,newCountry,newApp,mature,verifiedSafe,verifiedSuspicious};
+}
+
+export async function assessBehavioralAdjustment(input:{
+ organizationId:string;provider:"microsoft"|"google";tenantRecordId:string;
+ userPrincipalName:string;eventTime:string;ip?:string|null;country?:string|null;application?:string|null;
+ feedbackSafeAdjustment:number;feedbackSuspiciousAdjustment:number;
+}){
+ const user=input.userPrincipalName.trim().toLowerCase();
+ if(!user)return {adjustment:0,reasons:[]};
+ const since=new Date(new Date(input.eventTime).getTime()-90*86400000).toISOString();
+ const db=getSupabaseAdmin();
+ let q=db.from("signins").select("ip_address,country,app_name")
+  .eq("organization_id",input.organizationId).ilike("user_principal_name",user)
+  .ilike("status","success").gte("event_time",since)
+  .lt("event_time",input.eventTime).order("event_time",{ascending:false}).limit(500);
+ q=input.provider==="google"?q.eq("google_workspace_tenant_id",input.tenantRecordId):q.eq("microsoft_tenant_id",input.tenantRecordId);
+ const {data,error}=await q;
+ if(error)throw error;
+ return calculateBehavioralAdjustment({history:data||[],ip:input.ip,country:input.country,application:input.application,
+  feedbackSafeAdjustment:input.feedbackSafeAdjustment,feedbackSuspiciousAdjustment:input.feedbackSuspiciousAdjustment});
+}
+
 export async function recordBehaviorShadow(input: {
  organizationId:string; provider:"microsoft"|"google"; tenantRecordId:string;
  signinId:string; userPrincipalName:string; eventTime:string;
@@ -19,43 +80,16 @@ export async function recordBehaviorShadow(input: {
  const {data,error}=await q;
  if(error) throw error;
  const history=data||[];
- const reasons:string[]=[];
- let adjustment=0;
- // Observation is never trust. Only verified-safe administrator feedback can reduce risk.
  const matches=(field:"ip_address"|"city"|"country"|"app_name",value?:string|null)=>
   !!value && history.filter(r=>String(r[field]||"").trim().toLowerCase()===value.trim().toLowerCase()).length>=3;
  const familiarIp=matches("ip_address",input.ip);
  const familiarCity=matches("city",input.city);
  const familiarCountry=matches("country",input.country);
  const familiarApp=matches("app_name",input.application);
- // Phase 2C refinement: novelty alone is not evidence of a threat.
- // Require a mature history and multiple independent novel signals. The
- // existing rules and administrator-confirmed feedback remain authoritative.
- const norm=(v?:string|null)=>String(v||"").trim().toLowerCase();
- const unseen=(field:"ip_address"|"country"|"app_name",value?:string|null)=>
-  !!norm(value)&&!history.some(r=>norm(r[field])===norm(value));
- const newIp=unseen("ip_address",input.ip);
- const newCountry=unseen("country",input.country);
- const newApp=unseen("app_name",input.application);
- const mature=history.length>=10;
- const verifiedSafe=input.feedbackSafeAdjustment>0;
- const verifiedSuspicious=input.feedbackSuspiciousAdjustment>0;
- if(!mature){
-  reasons.push("Insufficient prior observations for behavioral risk adjustment (minimum 10)");
- }else if(verifiedSafe&&!verifiedSuspicious){
-  // A matching administrator-verified safe pattern already lowered live risk.
-  // Do not counteract that decision with generic novelty points.
-  reasons.push("Matching verified-safe feedback: no novelty-based shadow increase");
- }else if(newIp&&newCountry){
-  adjustment=8;
-  reasons.push("Unseen IP and country together in established user history (+8)");
-  if(newApp){adjustment+=4;reasons.push("Unseen application alongside IP and country change (+4)");}
- }else if(newIp&&newApp){
-  adjustment=4;
-  reasons.push("Unseen IP and application together in established user history (+4)");
- }else if(newIp||newCountry||newApp){
-  reasons.push("Single unfamiliar attribute observed; no standalone behavioral risk increase");
- }
+ const result=calculateBehavioralAdjustment({history,ip:input.ip,country:input.country,application:input.application,
+  feedbackSafeAdjustment:input.feedbackSafeAdjustment,feedbackSuspiciousAdjustment:input.feedbackSuspiciousAdjustment});
+ const {adjustment,newIp,newCountry,newApp,mature,verifiedSafe,verifiedSuspicious}=result;
+ const reasons=[...result.reasons];
  // Existing administrator feedback is already included in the live score.
  // Never double-apply it in shadow mode; capture it for audit and future comparisons.
  if(input.feedbackSafeAdjustment>0) reasons.push(`Verified-safe feedback already included in live score (-${input.feedbackSafeAdjustment})`);

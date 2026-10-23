@@ -1,5 +1,5 @@
 import {dateBounds} from "@/lib/dateRange";
-import { recordBehaviorShadow } from "@/lib/behaviorShadow";
+import { recordBehaviorShadow, assessBehavioralAdjustment, behavioralLiveEnabled } from "@/lib/behaviorShadow";
 import { getSupabaseAdmin, getOrCreateDevOrganization } from "@/lib/supabaseAdmin";
 import { createIncidentAnalysis } from "@/lib/aiIncident";
 import { getEffectiveNotificationSettings, getOrganizationNotificationSettings } from "@/lib/notificationSettings";
@@ -172,6 +172,22 @@ export async function processProviderIncidents(x:{
     feedbackSafeAdjustment:feedback.safeAdjustment||0,
     feedbackSuspiciousAdjustment:feedback.suspiciousAdjustment||0});
   } catch(shadowError) { console.warn("[behavior-shadow] assessment failed",shadowError); }
+  // Opt-in rollout only. An unavailable assessment never interrupts normal detection.
+  // Keep the shadow baseline score intact for independent before/after comparison.
+  if(behavioralLiveEnabled(x.organizationId,s.event_time)){
+   try {
+    const behavior=await assessBehavioralAdjustment({organizationId:x.organizationId,provider:x.provider,
+     tenantRecordId:x.tenantRecordId,userPrincipalName:String(s.user_principal_name||""),
+     eventTime:s.event_time,ip:s.ip_address,country:s.country||ii?.country||null,
+     application:s.app_name,feedbackSafeAdjustment:feedback.safeAdjustment||0,
+     feedbackSuspiciousAdjustment:feedback.suspiciousAdjustment||0});
+    if(behavior.adjustment>0){
+     score=Math.min(100,score+behavior.adjustment);
+     reasons.push(`Behavioral learning: +${behavior.adjustment} risk points (multiple unfamiliar sign-in attributes)`);
+     reasons.push(...behavior.reasons);
+    }
+   }catch(behaviorError){console.warn("[behavior-live] assessment failed; original risk score retained",behaviorError);}
+  }
   if(score<criteria.incident_threshold)continue;
 
   const allReasons=uniq([...reasons,...extra]);
